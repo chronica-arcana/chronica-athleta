@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <title>Fußball-Wiedereinstieg · Trainingsplan</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="shell header-inner">
+    <div>
+      <div class="eyebrow">REHAB · FITNESS · RETURN TO FOOTBALL</div>
+      <h1>⚽ Fußball-Wiedereinstieg</h1>
+      <p class="subtitle">September 2026 → Januar 2027 · 17 Wochen · Schrittweise zurück ins Mannschaftstraining</p>
+    </div>
+    <div class="header-status"><span class="status-dot"></span><span id="saveStatus">Lokal gespeichert</span></div>
+  </div>
+</header>
+
+<main class="shell">
+  <section class="hero-grid">
+    <article class="card intro-card">
+      <div class="section-kicker">STARTPUNKT</div>
+      <h2>Langsam aufbauen, Belastbarkeit vor Tempo.</h2>
+      <p>Der Befund beschreibt rechts einen Flüssigkeitsstreifen am anteroinferioren Rand des Os pubis an der Symphyse (secondary cleft sign) mit minimalem Ödem im Insertionsgebiet von M. rectus abdominis und Adduktoren. Das passt zu einer Belastungsproblematik im Bereich der Symphyse/pubischen Aponeurose und der Adduktoren; der Bildbefund allein legt jedoch nicht die klinische Diagnose oder Belastbarkeit fest. Deshalb ist der Plan symptom- und kriteriumsorientiert.</p>
+      <div class="notice warning"><strong>Medizinischer Rahmen:</strong> Der Plan ersetzt keine Untersuchung oder Freigabe durch Arzt/Sportphysio. Wegen des Befunds an Symphyse/Adduktoren werden Sprint, harte Richtungswechsel, explosive Sprünge und aggressive Adduktions-/Dehnreize erst spät und nur bei guter Verträglichkeit eingeführt. Bei zunehmendem Schmerz, Hinken, Kraftverlust oder deutlicher Verschlechterung am Folgetag Belastung nicht steigern.</div>
+    </article>
+    <article class="card dashboard-card">
+      <div class="section-kicker">ÜBERSICHT</div>
+      <div class="metric-grid">
+        <div class="metric"><span>Planfortschritt</span><strong id="overallProgress">0%</strong></div>
+        <div class="metric"><span>Einheiten</span><strong id="completedSessions">0</strong></div>
+        <div class="metric"><span>Ø RPE</span><strong id="avgRpe">–</strong></div>
+        <div class="metric"><span>Zusatztrainings</span><strong id="extraCount">0</strong></div>
+      </div>
+      <div class="progress large"><div class="bar" id="overallBar"></div></div>
+      <button class="primary full" id="recommendBtn">✨ Ergänzende Trainings empfehlen</button>
+      <div id="recommendations" class="recommendations hidden"></div>
+    </article>
+  </section>
+
+  <section class="card warmup-card">
+    <div class="section-kicker">VOR JEDEM KRAFTTRAINING</div>
+    <h2>Spezifisches Warm-up im Fitnessstudio</h2>
+    <p class="small">Die Anfahrt mit dem Rad zählt als allgemeines Warm-up. Im Studio danach kurz und spezifisch vorbereiten. Keine aggressive Dehnung oder maximale Adduktionsarbeit im schmerzhaften Bereich.</p>
+    <div class="warmup-grid">
+      <div><span class="step">01</span><strong>3–5 Min. locker</strong><p>Fahrrad oder Laufband bei niedriger Intensität. Gleichmäßige Bewegung, keine Intervalle.</p></div>
+      <div><span class="step">02</span><strong>Mobilisieren</strong><p>Becken kippen, kontrollierte Hüftkreise, Kniebeugen ohne Zusatzlast. Bewegungsumfang nur im gut verträglichen Bereich.</p></div>
+      <div><span class="step">03</span><strong>Aktivieren</strong><p>Glute Bridge, seitliches Bandgehen und leichte Adduktions-/Abduktionsarbeit. 1–2 kurze Sätze, nicht ermüden.</p></div>
+      <div><span class="step">04</span><strong>Aufwärmsätze</strong><p>Bei der ersten Kraftübung 1–2 sehr leichte Sätze vor den Arbeitssätzen. Erst dann Trainingsgewicht wählen.</p></div>
+    </div>
+  </section>
+
+  <section class="card plan-card">
+    <div class="section-head">
+      <div><div class="section-kicker">17-WOCHEN-PLAN</div><h2>Woche auswählen</h2></div>
+      <button class="secondary" id="addTrainingTop">＋ Zusatztraining</button>
+    </div>
+    <div class="tabs week-tabs" id="weekTabs"></div>
+    <div class="tabs day-tabs" id="dayTabs"></div>
+    <div id="weekContent"></div>
+  </section>
+
+  <section class="card insights-card">
+    <div class="section-kicker">AUTOMATISCHE STEUERUNG</div>
+    <h2>Belastung & nächste Woche</h2>
+    <p>Die App nutzt die zuletzt dokumentierten Einheiten, das RPE der gesamten Einheit (nicht einzelne Übungen), Dauer und Hinweise auf Beschwerden. Sie verändert nicht rückwirkend den Plan, sondern gibt eine klare Empfehlung für die nächste Einheit bzw. Woche.</p>
+    <div id="adaptationPanel" class="adaptation-panel"></div>
+  </section>
+
+  <section class="card rpe-card">
+    <div class="section-kicker">RPE-LEITFADEN</div>
+    <h2>Wie trage ich RPE ein?</h2>
+    <p><strong>RPE = Rate of Perceived Exertion</strong>, also wie anstrengend sich die gesamte Einheit subjektiv angefühlt hat.</p>
+    <div class="rpe-grid">
+      <div><b>1–2</b><span>Sehr leicht · große Reserve</span></div>
+      <div><b>3–4</b><span>Leicht · entspannt</span></div>
+      <div><b>5–6</b><span>Moderat · kontrolliert</span></div>
+      <div><b>7</b><span>Anstrengend · noch Reserve</span></div>
+      <div><b>8</b><span>Sehr anstrengend · wenig Reserve</span></div>
+      <div><b>9–10</b><span>Extrem bis maximal</span></div>
+    </div>
+    <p class="small">RPE wird immer als Gesamturteil über die komplette Einheit eingetragen – inklusive aller Lauf-, Kraft-, Athletik- und Pausenanteile. Bei diesem Wiedereinstieg ist nicht nur RPE wichtig: Schmerzen, Schwellung, Hinken oder eine Verschlechterung am nächsten Tag haben Vorrang vor einer rechnerischen Progression.</p>
+  </section>
+
+  <section class="card extras-card">
+    <div class="section-head"><div><div class="section-kicker">FLEXIBEL</div><h2>Zusatztrainings</h2><p class="small">Neue Einheiten werden der aktuell ausgewählten Woche als eigener Reiter hinzugefügt.</p></div><button class="primary" id="addTrainingBtn">＋ Training hinzufügen</button></div>
+    <div id="extraTrainings"></div>
+  </section>
+
+  <section class="card danger-zone">
+    <div><div class="section-kicker">LOKALE DATEN</div><h2>Tracker zurücksetzen</h2><p class="small">Alle Einträge liegen nur in diesem Browser. Es gibt bewusst keine Import-/Export-Funktion.</p></div>
+    <button class="danger" id="resetBtn">Alle Daten löschen</button>
+  </section>
+</main>
+
+<div class="modal hidden" id="trainingModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal-backdrop" data-close-modal></div>
+  <div class="modal-card">
+    <div class="section-head"><div><div class="section-kicker">NEUE EINHEIT</div><h2 id="modalTitle">Zusatztraining</h2></div><button class="icon-btn" data-close-modal aria-label="Schließen">×</button></div>
+    <form id="trainingForm">
+      <label>Art<select id="extraType"><option>Lauf</option><option>Fahrrad</option><option>Kraft</option><option>Athletik</option><option>Mobility</option><option>Yoga</option><option>Sonstiges</option></select></label>
+      <label>Titel<input id="extraTitle" required placeholder="z. B. lockere Grundlageneinheit"></label>
+      <div class="form-grid"><label>Datum<input id="extraDate" type="date" required></label><label>Dauer (Min.)<input id="extraDuration" type="number" min="1" placeholder="45"></label><label>RPE (1–10)<input id="extraRpe" type="number" min="1" max="10" placeholder="5"></label></div>
+      <label>Ergebnis / Hinweise<textarea id="extraNotes" rows="4" placeholder="Gefühl, Beschwerden, Besonderheiten"></textarea></label>
+      <div class="modal-actions"><button type="button" class="secondary" data-close-modal>Abbrechen</button><button class="primary" type="submit">Speichern</button></div>
+    </form>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
