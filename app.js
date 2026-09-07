@@ -1,7 +1,24 @@
-const KEY = "football_training_tracker_v3";
-let data = JSON.parse(localStorage.getItem(KEY) || "{}");
-data.sessions ||= {};
-data.extras ||= [];
+const KEY = "football_training_tracker_v6";
+const LEGACY_KEYS = ["football_training_tracker_v3", "football_training_tracker_v2", "football_training_tracker_v1"];
+function loadData(){
+  try {
+    let raw = localStorage.getItem(KEY);
+    if(!raw){
+      for(const legacy of LEGACY_KEYS){
+        raw = localStorage.getItem(legacy);
+        if(raw){ localStorage.setItem(KEY, raw); break; }
+      }
+    }
+    const parsed = raw ? JSON.parse(raw) : {};
+    parsed.sessions ||= {};
+    parsed.extras ||= [];
+    return parsed;
+  } catch(err){
+    console.error("Speicherdaten konnten nicht geladen werden", err);
+    return {sessions:{}, extras:[]};
+  }
+}
+let data = loadData();
 let selectedWeek = 0;
 let selectedTab = "t1";
 
@@ -80,11 +97,21 @@ const weeks = Array.from({length:17},(_,i)=>{
   return {n,label:`Woche ${n}`,range:`${fmtDate(d)} – ${fmtDate(new Date(d.getTime()+6*86400000))}`,phase:p,run1,run2,bike,strength:buildStrength(n)};
 });
 
-function save(){localStorage.setItem(KEY,JSON.stringify(data));const s=document.getElementById("saveStatus");if(s){s.textContent="Gerade gespeichert";setTimeout(()=>s.textContent="Lokal gespeichert",900)}updateDashboard();}
+function save(){
+  const status=document.getElementById("saveStatus");
+  try{
+    localStorage.setItem(KEY,JSON.stringify(data));
+    if(status){status.textContent="✓ Dauerhaft im Browser gespeichert";setTimeout(()=>status.textContent="✓ Automatisch gespeichert",1200)}
+  }catch(err){
+    console.error("Speichern fehlgeschlagen",err);
+    if(status) status.textContent="⚠ Speichern fehlgeschlagen";
+  }
+  updateDashboard();
+}
 function get(k){return data.sessions[k] ?? ""}
 function setVal(k,v){data.sessions[k]=v;save()}
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
-function field(k,type="text",placeholder="",opts=""){return `<input type="${type}" value="${esc(get(k))}" placeholder="${esc(placeholder)}" ${opts} onchange="setVal('${k}',this.value)">`}
+function field(k,type="text",placeholder="",opts=""){return `<input type="${type}" value="${esc(get(k))}" placeholder="${esc(placeholder)}" ${opts} oninput="setVal('${k}',this.value)">`}
 function renderWeekTabs(){document.getElementById("weekTabs").innerHTML=weeks.map((w,i)=>`<button class="${i===selectedWeek?"active":""}" onclick="selectWeek(${i})">${w.label}</button>`).join("");}
 function currentExtras(){return data.extras.filter(x=>x.week===weeks[selectedWeek].n)}
 function renderDayTabs(){
@@ -102,11 +129,18 @@ function sessionHeader(w,type){
  <div class="session-date"><div class="date-wide"><label>Trainingsdatum${field(`${p}_date`,"date")}</label></div><label>Start${field(`${p}_start`,"time")}</label><label>Ende${field(`${p}_end`,"time")}</label><label>RPE gesamt (1–10)${field(`${p}_rpe`,"number","z. B. 6",'min="1" max="10"')}<small>Eine Zahl für die gesamte Einheit – Lauf, Kraft, Athletik und Pausen zusammen.</small></label></div>`;
 }
 function exerciseRow(w,e,j){
- const [name,type,plan,desc,focus]=e, sets=(plan.match(/^(\d+)/)||[3,3])[1];
+ const [name,type,plan,desc,focus]=e;
+ const sets=Number((plan.match(/^(\d+)/)||[3,3])[1]);
  const isTime=type==="time";
- const rows=Array.from({length:Number(sets)},(_,s)=>{
+ const rows=Array.from({length:sets},(_,s)=>{
    const base=`w${w.n}_ex${j}_set${s+1}`;
-   return `<div class="set-grid"><div class="tag">${s+1}</div>${isTime?field(`${base}_time`,"text","z. B. 40 Sek."):field(`${base}_weight`,"text","kg")}${isTime?"<span class="set-unit">Sek.</span>" :field(`${base}_reps`,"number","Wdh.", 'min="0" step="1"')}</div>`;
+   const firstInput=isTime
+     ? field(`${base}_time`,"text","z. B. 40 Sek.")
+     : field(`${base}_weight`,"text","kg");
+   const secondInput=isTime
+     ? '<span class="set-unit">Sek.</span>'
+     : field(`${base}_reps`,"number","Wdh.",'min="0" step="1"');
+   return `<div class="set-grid"><div class="tag">${s+1}</div>${firstInput}${secondInput}</div>`;
  }).join("");
  return `<div class="exercise-row"><div class="exercise-main"><div><div class="exercise-name">${esc(name)}</div><div class="exercise-desc">${esc(desc)}</div><div class="small"><strong>Fokus:</strong> ${esc(focus)}</div></div><span class="pill">${esc(plan)}</span></div><div class="set-grid"><div class="set-head">Satz</div><div class="set-head">${isTime?"Dauer":"Gewicht"}</div><div class="set-head">${isTime?"Einheit":"Wiederholungen"}</div></div>${rows}</div>`;
 }
@@ -131,7 +165,28 @@ function returnToFootballTest(){
  <div class="rtf-summary"><strong>${ready?"Bereit für einen progressiven Einstieg ins Mannschaftstraining – sofern die medizinische Freigabe vorliegt.":"Noch nicht bereit für den uneingeschränkten Einstieg."}</strong><p class="small">Erfüllte Checkpunkte: ${checks}/13 · Zahlenkriterien: ${numericSqueeze&&numericLsi?"2/2":"0/2"} · Squeeze: ${vals.squeeze||"–"}/10 · Adduktions-LSI: ${vals.lsi||"–"}%</p></div>
  <p class="small">Orientierung: Die sportartspezifische Progression umfasst Sprinten, Richtungswechsel, Sprünge sowie Pass-/Kicking-Drills. Ein schrittweiser Einstieg in normale Trainingseinheiten ist sinnvoller als ein einmaliger „Alles-oder-nichts“-Test.</p></div>`;
 }
-function renderPlan(){renderWeekTabs();renderDayTabs();const w=weeks[selectedWeek];let c=selectedTab==="t1"?sessionForm(w,"t1"):selectedTab==="t2"?sessionForm(w,"t2"):selectedTab==="yoga"?yogaSection(w):selectedTab==="rtf"?returnToFootballTest():extraSection(currentExtras().find(x=>`extra:${x.id}`===selectedTab));document.getElementById("weekContent").innerHTML=c;updateWeekProgress(w);}
+function renderPlan(){
+  const target=document.getElementById("weekContent");
+  try{
+    renderWeekTabs();
+    renderDayTabs();
+    const w=weeks[selectedWeek];
+    let c;
+    if(selectedTab==="t1") c=sessionForm(w,"t1");
+    else if(selectedTab==="t2") c=sessionForm(w,"t2");
+    else if(selectedTab==="yoga") c=yogaSection(w);
+    else if(selectedTab==="rtf" && w.n===17) c=returnToFootballTest();
+    else {
+      const extra=currentExtras().find(x=>`extra:${x.id}`===selectedTab);
+      c=extra ? extraSection(extra) : sessionForm(w,"t1");
+    }
+    target.innerHTML=c;
+    updateWeekProgress(w);
+  }catch(err){
+    console.error("Wochenplan konnte nicht angezeigt werden",err);
+    if(target) target.innerHTML=`<div class="plan-box"><h3>Wochenplan konnte nicht geladen werden</h3><p>Bitte die Seite einmal neu laden. Deine gespeicherten Daten bleiben erhalten.</p><p class="small">Technischer Hinweis: ${esc(err.message||err)}</p></div>`;
+  }
+}
 function updateWeekProgress(w){let keys=[`w${w.n}_t1_date`,`w${w.n}_t2_date`,`w${w.n}_yoga1_date`,`w${w.n}_yoga2_date`];w.strength.forEach((e,j)=>{const sets=Number((e[2].match(/^(\d+)/)||[3,3])[1]);for(let s=1;s<=sets;s++)keys.push(`w${w.n}_ex${j}_set${s}_${e[1]==="time"?"time":"reps"}`)});const done=keys.filter(k=>get(k)!=="").length,pct=Math.round(done/keys.length*100);["t1","t2"].forEach(t=>{const el=document.getElementById(`bar-w${w.n}_${t}`),p=document.getElementById(`prog-w${w.n}_${t}`);if(el)el.style.width=pct+"%";if(p)p.textContent=`Dokumentiert: ${pct}%`})}
 function getCompletedSessions(){const arr=[];weeks.forEach(w=>["t1","t2"].forEach(t=>{const p=`w${w.n}_${t}`,date=get(`${p}_date`);if(date)arr.push({date,rpe:Number(get(`${p}_rpe`))||null,duration:durationFor(p),notes:get(`${p}_notes`)||"",kind:t});}));data.extras.forEach(x=>{const p=`extra_${x.id}`,date=get(`${p}_date`)||x.date;if(date)arr.push({date,rpe:Number(get(`${p}_rpe`))||Number(x.rpe)||null,duration:Number(get(`${p}_duration`))||Number(x.duration)||45,notes:get(`${p}_notes`)||x.notes||"",kind:"extra"});});return arr.sort((a,b)=>a.date.localeCompare(b.date))}
 function durationFor(p){const s=get(`${p}_start`),e=get(`${p}_end`);if(s&&e){const [sh,sm]=s.split(":").map(Number),[eh,em]=e.split(":").map(Number);let d=(eh*60+em)-(sh*60+sm);if(d<0)d+=1440;if(d>0)return d}return 45}
@@ -146,5 +201,16 @@ function addExtra(e){e.preventDefault();const id=Date.now().toString(36);data.ex
 function removeExtra(id){data.extras=data.extras.filter(x=>x.id!==id);Object.keys(data.sessions).filter(k=>k.startsWith(`extra_${id}_`)).forEach(k=>delete data.sessions[k]);save();selectedTab="t1";renderPlan()}
 function recommendations(){const a=assessment(),el=document.getElementById("recommendations");const list=a.zone==="red"?["20–30 Min. sehr lockeres Fahrrad oder Spaziergang","10–15 Min. Mobility ohne provokative Endposition","Leichter Core: Pallof Press / ruhige Rumpfarbeit"]:a.zone==="yellow"?["20–30 Min. lockere Grundlagenausdauer","10–15 Min. Mobility und kontrollierte Hüftbewegung","Technik: leichte Koordination ohne Sprint- oder Sprungbelastung"]:["25–40 Min. lockere Grundlagenausdauer","10–15 Min. Mobility / Yoga","Koordination und Technik mit niedriger bis moderater Intensität"];el.innerHTML=`<strong>Passend zur aktuellen Belastung:</strong><ul>${list.map(x=>`<li>${x}</li>`).join("")}</ul><p class="small">Bei Beschwerden gilt die Entlastungsregel unabhängig von der Empfehlung.</p>`;el.classList.remove("hidden")}
 function resetData(){if(confirm("Wirklich alle Trainingsdaten löschen?")){data={sessions:{},extras:[]};save();selectedWeek=0;selectedTab="t1";renderPlan()}}
-document.getElementById("recommendBtn").addEventListener("click",recommendations);document.getElementById("addTrainingBtn").addEventListener("click",openModal);document.getElementById("addTrainingTop").addEventListener("click",openModal);document.getElementById("resetBtn").addEventListener("click",resetData);document.getElementById("trainingForm").addEventListener("submit",addExtra);document.querySelectorAll("[data-close-modal]").forEach(x=>x.addEventListener("click",closeModal));
-renderPlan();updateDashboard();
+function initApp(){
+  document.getElementById("recommendBtn")?.addEventListener("click",recommendations);
+  document.getElementById("addTrainingBtn")?.addEventListener("click",openModal);
+  document.getElementById("addTrainingTop")?.addEventListener("click",openModal);
+  document.getElementById("resetBtn")?.addEventListener("click",resetData);
+  document.getElementById("trainingForm")?.addEventListener("submit",addExtra);
+  document.querySelectorAll("[data-close-modal]").forEach(x=>x.addEventListener("click",closeModal));
+  const status=document.getElementById("saveStatus");
+  if(status) status.textContent="✓ Automatisch gespeichert";
+  renderPlan();
+  updateDashboard();
+}
+if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",initApp); else initApp();

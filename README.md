@@ -1,3 +1,16 @@
+# Fußball Training Tracker – v6
+
+Diese Version ist für GitHub Pages besonders robust: **die komplette App steckt in einer einzigen `index.html`**. Dadurch wird der Wochenplan auch dann angezeigt, wenn separate CSS-/JS-Dateien beim Upload fehlen.
+
+## Speichern
+- Eingaben werden **sofort beim Tippen** in `localStorage` gespeichert.
+- Vorhandene Daten aus den früheren Speicherständen `v1`, `v2` und `v3` werden automatisch übernommen.
+- Die Daten bleiben nach Neuladen und Browser-Neustart erhalten, solange Website-Daten für die GitHub-Pages-Adresse nicht gelöscht werden.
+- Da GitHub Pages statisch ist, gibt es ohne externes Backend keine automatische Synchronisierung zwischen verschiedenen Geräten/Browsern.
+
+## GitHub Pages
+Lade mindestens die Datei `index.html` in das Stammverzeichnis deines GitHub-Pages-Repositories hoch. `styles.css` und `app.js` liegen zusätzlich bei, werden von der Standalone-Datei aber nicht benötigt.
+
 # Fußball-Wiedereinstieg · Trainings-Tracker
 
 GitHub-Pages-taugliche, lokale Web-App für den Wiedereinstieg von September 2026 bis Januar 2027.
