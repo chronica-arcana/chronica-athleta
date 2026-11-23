@@ -48,6 +48,18 @@ export function mapBodyBattery(item) {
   return {date, bodyBatteryMorning: Math.max(...vals.slice(0, Math.max(1, Math.ceil(vals.length / 3))))};
 }
 
+export function mapSteps(item) {
+  const date = day(first(item || {}, "calendarDate", "date")), steps = num(first(item || {}, "totalSteps", "steps", "stepCount"));
+  return date && steps != null ? {date, steps: Math.round(steps)} : null;
+}
+// VO2max: Garmin liefert je Tag Werte für "generic" (Laufen) und "cycling"
+export function mapVo2(item) {
+  const g = first(item || {}, "generic") || item || {}, c = first(item || {}, "cycling") || {};
+  const date = day(first(g, "calendarDate") || first(item || {}, "calendarDate", "date"));
+  const v = num(first(g, "vo2MaxPreciseValue", "vo2MaxValue", "vo2Max")), vc = num(first(c, "vo2MaxPreciseValue", "vo2MaxValue", "vo2Max"));
+  return date && (v != null || vc != null) ? {date, vo2max: v != null ? round(v, 1) : null, vo2maxCycling: vc != null ? round(vc, 1) : null} : null;
+}
+
 // Form einer Antwort ohne Werte (nur Feldnamen/Typen), für die Diagnose
 export function shapeOf(v, depth = 3) {
   if (Array.isArray(v)) {

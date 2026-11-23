@@ -1,6 +1,7 @@
 // Erzeugt den konkreten Inhalt (Blöcke, Übungen, Titel) einer Einheit – deterministisch, damit eine Einheit
 // bei jeder Anpassung (z. B. kürzer/länger) neu und konsistent berechnet werden kann.
 import {KINDS, kindInfo, SPORTS, EXERCISES, EQUIPMENT_TIERS, FOCUS_PATTERNS} from "./catalog.js";
+import {FLOWS, buildFlow, pickFlow} from "./yoga.js";
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 export const round5 = n => Math.max(5, Math.round(n / 5) * 5);
@@ -112,9 +113,12 @@ export function buildSession(kind, minutes, ctx = {}) {
     case "team_match":
       out.blocks = [B("Einheit", `${m} Min Spiel / Mannschaftstraining. Vorher gut aufwärmen, nachher Belastung (RPE) und Beschwerden eintragen.`)];
       break;
-    case "mobility":
-      out.blocks = [B("Flow", `${m} Min ruhiger Yoga-/Mobility-Flow: Hüftbeuger, Taube, Brustwirbelsäule, Waden, Schulter. Atmen statt dehnen bis zum Schmerz.`)];
+    case "mobility": {
+      const key = pickFlow(ctx), f = FLOWS[key];
+      out.title = `Yoga: ${f.title}`; out.flowKey = key; out.flow = buildFlow(key, m);
+      out.blocks = [B("Fokus", f.focus), B("Ablauf", `${out.flow.length} Positionen in ${m} Min. Ruhig atmen, nie bis zum Schmerz dehnen.`)];
       break;
+    }
     case "walk":
       out.blocks = [B("Haupteil", `${m} Min zügig spazieren oder wandern – bewusst locker, Natur genießen.`)];
       break;

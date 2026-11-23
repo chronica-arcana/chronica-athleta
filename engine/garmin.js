@@ -60,7 +60,8 @@ export function normalizeExport(raw) {
     type: String(a.type || "").toLowerCase(), name: String(a.name || "").slice(0, 80), durationMin: n(a.durationMin), distanceKm: n(a.distanceKm), avgHr: n(a.avgHr), maxHr: n(a.maxHr),
     calories: n(a.calories), aerobicTE: n(a.aerobicTE), anaerobicTE: n(a.anaerobicTE), trainingLoad: n(a.trainingLoad)})).filter(a => a.date);
   const daily = (Array.isArray(raw.daily) ? raw.daily : []).map(d => ({date: day(d.date), restingHr: n(d.restingHr), hrvAvg: n(d.hrvAvg), hrvStatus: String(d.hrvStatus || "").toUpperCase(),
-    sleepHours: n(d.sleepHours), sleepScore: n(d.sleepScore), bodyBatteryMorning: n(d.bodyBatteryMorning), stressAvg: n(d.stressAvg)})).filter(d => d.date);
+    sleepHours: n(d.sleepHours), sleepScore: n(d.sleepScore), bodyBatteryMorning: n(d.bodyBatteryMorning), stressAvg: n(d.stressAvg),
+    steps: n(d.steps), vo2max: n(d.vo2max), vo2maxCycling: n(d.vo2maxCycling)})).filter(d => d.date);
   if (!acts.length && !daily.length) throw new Error("Die Datei enthält keine Aktivitäten oder Tageswerte.");
   return {activities: acts.slice(-1500), daily: daily.slice(-400)};
 }

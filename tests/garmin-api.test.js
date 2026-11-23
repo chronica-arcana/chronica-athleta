@@ -4,7 +4,7 @@ import http from "node:http";
 import crypto from "node:crypto";
 import handler, {encrypt, decrypt, TOKEN_URL} from "../api/garmin.js";
 import {extractAccessToken} from "../api/garmin.js";
-import {mapActivity, mapSleep, mapHrv, mapRestingHr, mapBodyBattery, mergeDaily, shapeOf, asList} from "../api/_garmin-map.js";
+import {mapActivity, mapSleep, mapHrv, mapRestingHr, mapBodyBattery, mapSteps, mapVo2, mergeDaily, shapeOf, asList} from "../api/_garmin-map.js";
 
 const server = fn => new Promise(r => { const s = http.createServer(fn); s.listen(0, () => r(s)); });
 const call = async (env, {method = "POST", headers = {authorization: "Bearer good"}, body = {}} = {}) => {
@@ -26,6 +26,8 @@ async function setup() {
     if (flags.denyData || q.headers.authorization !== `Bearer ${TOKEN}`) { r.statusCode = 401; return r.end("{}"); }
     if (p === "/activitylist-service/activities/search/activities") return r.end(JSON.stringify([{activityId: 11, activityName: "Morgenlauf-GEHEIM", startTimeLocal: `${yesterday} 07:30:00`, activityType: {typeKey: "running"}, duration: 2700, distance: 8000, averageHR: 150, aerobicTrainingEffect: 3.1, activityTrainingLoad: 120}, {kaputt: true}]));
     if (p.startsWith("/hrv-service/hrv/daily/")) return r.end(JSON.stringify({hrvSummaries: [{calendarDate: yesterday, lastNightAvg: 55, status: "balanced"}]}));
+    if (p.startsWith("/usersummary-service/stats/steps/daily/")) return r.end(JSON.stringify([{calendarDate: yesterday, totalSteps: 11234, stepGoal: 10000}]));
+    if (p.startsWith("/metrics-service/metrics/maxmet/daily/")) return r.end(JSON.stringify([{generic: {calendarDate: yesterday, vo2MaxPreciseValue: 51.74}, cycling: {vo2MaxValue: 49}}]));
     if (p === "/wellness-service/wellness/bodyBattery/reports/daily") return r.end(JSON.stringify([{date: yesterday, bodyBatteryValuesArray: [[1, 40], [2, 80], [3, 70], [4, 30], [5, 20], [6, 10]]}]));
     if (p === "/sleep-service/sleep/dailySleep") { if (flags.failSleep) { r.statusCode = 404; return r.end("{}"); } return r.end(JSON.stringify({dailySleepDTO: {calendarDate: u.searchParams.get("date"), sleepTimeSeconds: 27000, sleepScores: {overall: {value: 80}}}})); }
     if (p === "/wellness-service/wellness/dailyHeartRate") return r.end(JSON.stringify({calendarDate: u.searchParams.get("date"), restingHeartRate: 51}));
@@ -93,6 +95,7 @@ test("Garmin-Funktion: Login-Pflicht, Key-Prüfung, verschlüsselte Ablage, nie 
     assert.deepEqual([act.user_id, act.id, act.date, act.data.type, act.data.durationMin, act.data.distanceKm, act.data.avgHr, act.data.aerobicTE, act.data.trainingLoad], ["u1", "11", s.yesterday, "running", 45, 8, 150, 3.1, 120]);
     const dy = s.log.upserts.garmin_daily.find(d => d.date === s.yesterday);
     assert.deepEqual([dy.user_id, dy.data.sleepHours, dy.data.sleepScore, dy.data.restingHr, dy.data.hrvAvg, dy.data.hrvStatus, dy.data.bodyBatteryMorning], ["u1", 7.5, 80, 51, 55, "BALANCED", 80]);
+    assert.deepEqual([dy.data.steps, dy.data.vo2max, dy.data.vo2maxCycling], [11234, 51.7, 49], "Schritte und VO2max kommen in den Tageswerten an");
     assert.ok(s.log.upserts.garmin_daily.every(d => d.user_id === "u1") && s.log.upserts.garmin_activities.every(a => a.user_id === "u1"));
     assert.equal(s.rows.get("u1").last_error, null); assert.ok(s.rows.get("u1").last_sync_at);
     assert.deepEqual(sync.body.report.sleep, {ok: 4, failed: 0, items: 4, lastStatus: 200});
@@ -104,7 +107,7 @@ test("Garmin-Funktion: Login-Pflicht, Key-Prüfung, verschlüsselte Ablage, nie 
 
     // Diagnose: nur Struktur, keine persönlichen Werte
     const dg = await call(s.env, {body: {action: "diagnose"}});
-    assert.equal(dg.status, 200); assert.deepEqual(Object.keys(dg.body.endpoints).sort(), ["activities", "bodyBattery", "heartRate", "hrv", "sleep"]);
+    assert.equal(dg.status, 200); assert.deepEqual(Object.keys(dg.body.endpoints).sort(), ["activities", "bodyBattery", "dailySummaries", "heartRate", "hrv", "sleep", "steps", "userSummaryDaily", "vo2max"]);
     assert.equal(dg.body.endpoints.activities.shape[0].activityName, "string");
     const dgs = JSON.stringify(dg.body); assert.ok(!dgs.includes("GEHEIM") && !dgs.includes("TOKEN-SECRET") && !dgs.includes("07:30"), "keine Werte in der Diagnose");
 
@@ -194,4 +197,12 @@ test("Mapper gegen die echte Struktur aus der Garmin-Diagnose (Feldnamen wie von
   assert.equal(mapBodyBattery({date: "2026-11-22", bodyBatteryValuesArray: [[1, "MEASURED", null]]}), null);
   // Diagnose zeigt Tupel-Listen mit allen Elementtypen
   assert.deepEqual(shapeOf({v: [[1700000000000, "MEASURED", 55, 1]]}), {v: [["number", "string", "number", "number"]]});
+});
+
+test("Mapper: Schritte und VO2max (Laufen und Rad)", () => {
+  assert.deepEqual(mapSteps({calendarDate: "2026-11-22", totalSteps: 9876.4, stepGoal: 8000}), {date: "2026-11-22", steps: 9876});
+  assert.equal(mapSteps({calendarDate: "2026-11-22"}), null); assert.equal(mapSteps({totalSteps: 5}), null);
+  assert.deepEqual(mapVo2({generic: {calendarDate: "2026-11-22", vo2MaxPreciseValue: 52.46, vo2MaxValue: 52}, cycling: {vo2MaxValue: 48.2}}), {date: "2026-11-22", vo2max: 52.5, vo2maxCycling: 48.2});
+  assert.deepEqual(mapVo2({generic: {calendarDate: "2026-11-22", vo2MaxValue: 50}}), {date: "2026-11-22", vo2max: 50, vo2maxCycling: null});
+  assert.equal(mapVo2({generic: {calendarDate: "2026-11-22"}}), null);
 });

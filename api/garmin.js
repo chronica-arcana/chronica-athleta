@@ -11,7 +11,7 @@
 // Umgebungsvariablen: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, GARMIN_ENC_KEY (32 Byte, base64)
 import crypto from "node:crypto";
 import {json, readBody, timedFetch, authenticate} from "./_lib.js";
-import {mapActivity, mapSleep, mapHrv, mapRestingHr, mapBodyBattery, asList, mergeDaily, shapeOf} from "./_garmin-map.js";
+import {mapActivity, mapSleep, mapHrv, mapRestingHr, mapBodyBattery, mapSteps, mapVo2, asList, mergeDaily, shapeOf} from "./_garmin-map.js";
 
 // Laut Garmin-Doku (Personal API): API-Key wird gegen ein Access-Token getauscht.
 export const TOKEN_URL = "https://personal.connectapi.garmin.com/personalapitoken-service/personal-api/personal-api-key/token";
@@ -113,6 +113,8 @@ const ENDPOINTS = {
   activities: (from, to) => ["/activitylist-service/activities/search/activities", {startDate: from, endDate: to, start: 0, limit: 200}],
   hrv: (from, to) => [`/hrv-service/hrv/daily/${from}/${to}`, {}],
   bodyBattery: (from, to) => ["/wellness-service/wellness/bodyBattery/reports/daily", {startDate: from, endDate: to}],
+  steps: (from, to) => [`/usersummary-service/stats/steps/daily/${from}/${to}`, {}],
+  vo2max: (from, to) => [`/metrics-service/metrics/maxmet/daily/${from}/${to}`, {}],
   sleep: date => ["/sleep-service/sleep/dailySleep", {date}],
   heartRate: date => ["/wellness-service/wellness/dailyHeartRate", {date}]
 };
@@ -120,25 +122,29 @@ const ENDPOINTS = {
 export async function fetchPersonalData(token, from, to, env = process.env) {
   const f = isoDay(from), t = isoDay(to), report = {}, note = (name, r, n) => { const e = report[name] || (report[name] = {ok: 0, failed: 0, items: 0, lastStatus: null}); r.ok ? e.ok++ : e.failed++; e.items += n || 0; e.lastStatus = r.status; };
   const days = []; for (let d = new Date(from); isoDay(d) <= t; d = new Date(d.getTime() + 864e5)) days.push(isoDay(d));
-  const [acts, hrv, bb] = await Promise.all([["activities", f, t], ["hrv", f, t], ["bodyBattery", f, t]].map(async ([name, a, b]) => { const r = await gget(env, token, ...ENDPOINTS[name](a, b)); return {name, r}; }));
+  const [acts, hrv, bb, stp, vo2] = await Promise.all([["activities", f, t], ["hrv", f, t], ["bodyBattery", f, t], ["steps", f, t], ["vo2max", f, t]].map(async ([name, a, b]) => { const r = await gget(env, token, ...ENDPOINTS[name](a, b)); return {name, r}; }));
   const activities = asList(acts.r.data).map(mapActivity).filter(Boolean); note("activities", acts.r, activities.length);
   const hrvParts = asList(hrv.r.data).map(mapHrv).filter(Boolean); note("hrv", hrv.r, hrvParts.length);
   const bbParts = asList(bb.r.data).map(mapBodyBattery).filter(Boolean); note("bodyBattery", bb.r, bbParts.length);
+  const stepParts = asList(stp.r.data).map(mapSteps).filter(Boolean); note("steps", stp.r, stepParts.length);
+  const vo2Parts = asList(vo2.r.data).map(mapVo2).filter(Boolean); note("vo2max", vo2.r, vo2Parts.length);
   const perDay = await pool(days, 5, async date => {
     const [s, h] = await Promise.all([gget(env, token, ...ENDPOINTS.sleep(date)), gget(env, token, ...ENDPOINTS.heartRate(date))]);
     const sp = s.ok ? mapSleep(s.data, date) : null, hp = h.ok ? mapRestingHr(h.data, date) : null;
     note("sleep", s, sp ? 1 : 0); note("heartRate", h, hp ? 1 : 0);
     return [sp, hp];
   });
-  const rs = [acts.r, hrv.r, bb.r];
+  const rs = [acts.r, hrv.r, bb.r, stp.r, vo2.r];
   if (rs.every(r => r.status === 401 || r.status === 403)) throw new ApiError(401, "Garmin hat den Zugriff verweigert – Key abgelaufen oder widerrufen?");
-  return {activities, daily: mergeDaily([hrvParts, bbParts, ...perDay]), report};
+  return {activities, daily: mergeDaily([hrvParts, bbParts, stepParts, vo2Parts, ...perDay]), report};
 }
 
 // Fehlersuche: Struktur (nur Feldnamen) der echten Antworten
 export async function diagnose(token, env = process.env) {
   const to = new Date(), from = new Date(Date.now() - 14 * 864e5), f = isoDay(from), t = isoDay(to), y = isoDay(new Date(Date.now() - 864e5)), out = {};
-  const calls = {activities: ENDPOINTS.activities(f, t), hrv: ENDPOINTS.hrv(f, t), bodyBattery: ENDPOINTS.bodyBattery(f, t), sleep: ENDPOINTS.sleep(y), heartRate: ENDPOINTS.heartRate(y)};
+  const calls = {activities: ENDPOINTS.activities(f, t), hrv: ENDPOINTS.hrv(f, t), bodyBattery: ENDPOINTS.bodyBattery(f, t), steps: ENDPOINTS.steps(f, t), vo2max: ENDPOINTS.vo2max(f, t), sleep: ENDPOINTS.sleep(y), heartRate: ENDPOINTS.heartRate(y),
+    // nur Diagnose: enthält dailysummaries Bereitschafts-/Erholungswerte (Training Readiness, Recovery Time)?
+    dailySummaries: ["/usersummary-service/v2/dailysummaries", {startDate: y, endDate: y}], userSummaryDaily: ["/usersummary-service/usersummary/daily", {calendarDate: y}]};
   await Promise.all(Object.entries(calls).map(async ([name, [path, params]]) => { const r = await gget(env, token, path, params); out[name] = {path, params, status: r.status, shape: shapeOf(r.data)}; }));
   return out;
 }

@@ -195,7 +195,25 @@ export function assignDays(items, dates) {
   return best || [];
 }
 
-const PRIO = {optional: 0, support: 1, key: 2};
+// Yoga/Mobility wird automatisch als zusätzliche, optionale Einheit eingeplant, wenn es sinnvoll ist:
+// Wiedereinstieg/Gesundheit, Entlastungs- und Taperwochen, mind. 2 Krafteinheiten oder 2 Schlüsseleinheiten in der Woche.
+// Bevorzugt am Tag nach der anstrengendsten Einheit. Zählt nicht zu daysPerWeek.
+function pickYogaSlot(goal, wf, rows, ws, candidateDows, startDate, eventDate) {
+  if (goal.autoYoga === false || rows.some(r => kindInfo(r.item.kind).group === "recovery")) return null;
+  const strengthN = rows.filter(r => kindInfo(r.item.kind).group === "strength").length, heavy = rows.filter(r => kindInfo(r.item.kind).key).length;
+  if (!(goal.mode === "return" || goal.mode === "health" || wf.deload || wf.phaseKey === "taper" || strengthN >= 2 || heavy >= 2)) return null;
+  const used = new Set(rows.map(r => r.date)), byDate = new Map(rows.map(r => [r.date, r]));
+  const free = candidateDows.map(d => addDays(ws, d)).filter(d => d >= startDate && !used.has(d) && (!eventDate || d < eventDate));
+  if (!free.length) return null;
+  const score = d => { let sc = 0; const prev = byDate.get(addDays(d, -1)), next = byDate.get(addDays(d, 1));
+    if (prev) { const i = kindInfo(prev.item.kind); sc -= (i.intensity === "hard" || i.long) ? 3 : i.group === "strength" ? 2 : 1; }
+    if (next && kindInfo(next.item.kind).intensity === "hard") sc += 2; return sc; };
+  free.sort((a, b) => score(a) - score(b) || a.localeCompare(b));
+  const day = free[0], prev = byDate.get(addDays(day, -1)), afterStrength = prev && kindInfo(prev.item.kind).group === "strength";
+  return {date: day, minutes: wf.deload ? 30 : clamp(round5(goal.minutesPerSession * 0.5), 20, 30), flowKey: wf.deload ? "relax" : afterStrength ? "strength" : "regeneration"};
+}
+
+const PRIO = {bonus: -1, optional: 0, support: 1, key: 2}; // "bonus" (Yoga) entfällt bei Platzmangel zuerst
 export function trimToFit(items, capacity) {
   const out = items.slice(), dropped = [];
   while (out.length > capacity) {
@@ -294,22 +312,24 @@ export function generatePlan(rawGoal, opts = {}) {
     const placed = assignDays(kept, candidates);
     // Wochenlast darf (außer Deload/Taper) höchstens ~10 % über der Vorwoche liegen: ggf. längste Einheit schrittweise um 5 Min kürzen.
     const rows = placed.map(({item, date}) => ({item, date, minutes: minutesFor(item.kind, goal.minutesPerSession, wf.factor)}));
+    const yoga = pickYogaSlot(goal, wf, rows, ws, candidateDows, startDate, isEventWeek ? eventDate : null);
+    if (yoga) rows.push({item: {kind: "mobility", priority: "bonus"}, date: yoga.date, minutes: yoga.minutes, flowKey: yoga.flowKey});
     const loadOf = r => Math.round(r.minutes * kindInfo(r.item.kind).loadPerMin);
     if (prevLoad != null && prevCount === placed.length && !wf.deload && wf.phaseKey !== "taper" && !isEventWeek) {
       const cap = prevLoad * 1.1;
       for (let guard = 0; guard < 40 && rows.reduce((a, r) => a + loadOf(r), 0) > cap; guard++) {
-        const r = rows.filter(x => x.minutes > 15 && x.item.kind !== "strength_snack").sort((x, y) => y.minutes - x.minutes)[0];
+        const r = rows.filter(x => x.minutes > 15 && x.item.kind !== "strength_snack" && x.item.kind !== "mobility").sort((x, y) => y.minutes - x.minutes)[0];
         if (!r) break; r.minutes -= 5;
       }
     }
     let weekLoad = 0;
-    for (const {item, date, minutes} of rows) {
-      const built = buildSession(item.kind, minutes, {...ctx, tier});
+    for (const {item, date, minutes, flowKey} of rows) {
+      const built = buildSession(item.kind, minutes, {...ctx, tier, flowKey});
       const info = kindInfo(item.kind);
       const load = Math.round(built.durationMin * info.loadPerMin);
       weekLoad += load;
       sessions.push({id: uuid(), planId, date, week: wf.idx, kind: item.kind, sport: info.sport, title: built.title, durationMin: built.durationMin,
-        intensity: info.intensity, load, priority: item.priority, status: "planned", blocks: built.blocks, exercises: built.exercises, ctx, source: "plan", log: null});
+        intensity: info.intensity, load, priority: item.priority, status: "planned", blocks: built.blocks, exercises: built.exercises, flow: built.flow, flowKey: built.flowKey, ctx, source: "plan", log: null});
     }
     if (isEventWeek) {
       const mins = (goal.event.minutes) || (preset && preset.minutes[goal.level]) || 90;

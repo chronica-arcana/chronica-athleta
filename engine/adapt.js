@@ -30,8 +30,9 @@ const ctxFor = (w, s) => ({...s.ctx, tier: undefined, equipment: s.ctx && s.ctx.
 
 function rebuild(w, s, minutes) {
   const info = kindInfo(s.kind);
-  const built = buildSession(s.kind, minutes, {...s.ctx, addon: s.addon});
-  s.durationMin = built.durationMin; s.blocks = built.blocks;
+  const built = buildSession(s.kind, minutes, {...s.ctx, addon: s.addon, flowKey: s.flowKey});
+  s.durationMin = built.durationMin; s.blocks = built.blocks; s.flow = built.flow; s.flowKey = built.flowKey;
+  if (s.kind === "mobility") s.title = built.title;
   const targets = w.P.meta.targets || {};
   s.exercises = built.exercises.map(e => ({...e, target: targets[e.name] || undefined}));
   if (s.addon) s.addon.exercises = buildSession("strength_snack", s.addon.minutes, s.ctx).exercises;
@@ -184,7 +185,7 @@ export function addSession(plan, sessions, {date, kind, minutes, done = false, l
   const built = buildSession(kind, m, ctx);
   const s = {id: uuid(), planId: plan.id, date, week: weekIndexOf(plan, date), kind, sport: info.sport, title: built.title, durationMin: built.durationMin, intensity: info.intensity,
     load: Math.round(built.durationMin * info.loadPerMin), priority: "optional", status: done ? "done" : "planned", blocks: built.blocks,
-    exercises: built.exercises.map(e => ({...e, target: (plan.meta.targets || {})[e.name]})), ctx, source, log: done ? (log || {durationMin: built.durationMin}) : null, locked: true, baseMinutes: built.durationMin};
+    exercises: built.exercises.map(e => ({...e, target: (plan.meta.targets || {})[e.name]})), flow: built.flow, flowKey: built.flowKey, ctx, source, log: done ? (log || {durationMin: built.durationMin}) : null, locked: true, baseMinutes: built.durationMin};
   w.S.set(s.id, s); w.touch(s.id);
   const ws = weekStart(date);
   if (w.P.meta.weekTargets[ws] == null) w.P.meta.weekTargets[ws] = s.load;
