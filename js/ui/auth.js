@@ -14,8 +14,8 @@ export function AuthScreen() {
     setBusy(false);
   };
   return html`<div class="auth">
-    <div class="logo">🏅</div>
-    <div class="stack" style="gap:6px"><h1>Dein flexibler Trainingsplan</h1><p class="muted">Laufen, Rad, Schwimmen, Kraft, Teamsport – KI-Coach, Garmin und ein Plan, der sich deinem Alltag anpasst.</p></div>
+    <img class="logo" src="icons/icon-192.png" alt="Chronica Athleta" width="72" height="72" />
+    <div class="stack" style="gap:6px"><div class="small bold muted" style="letter-spacing:.14em;text-transform:uppercase">Chronica</div><h1>Athleta</h1><p class="muted">Dein flexibler Trainingsplan: Laufen, Rad, Schwimmen, Kraft, Teamsport – mit KI-Coach, Garmin und einem Plan, der sich deinem Alltag anpasst.</p></div>
     <form class="stack" onSubmit=${submit}>
       <label class="field">E-Mail<input type="email" autocomplete="email" inputmode="email" required value=${email} onInput=${e => setEmail(e.target.value)} /></label>
       ${mode !== "reset" && html`<label class="field">Passwort<input type="password" autocomplete=${mode === "login" ? "current-password" : "new-password"} minlength="8" required value=${pw} onInput=${e => setPw(e.target.value)} /></label>`}

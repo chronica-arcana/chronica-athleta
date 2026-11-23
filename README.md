@@ -1,4 +1,6 @@
-# Flexibler Multisport-Trainingsplaner
+# Chronica Athleta
+
+*Flexibler Multisport-Trainingsplaner* – Teil der Chronica-Tools.
 
 Mobil-optimierte Web-App (PWA) für Laufen, Rad, Schwimmen, Kraft, Teamsport, Yoga/Mobility und Wiedereinstieg nach Verletzung.
 Ein **Wizard** erfasst dein Ziel (frei formuliert, die KI füllt vor und fragt nach), erstellt einen Plan für den von dir gewählten Zeitraum –
