@@ -68,12 +68,23 @@ export async function hit(userId, limit, env = process.env) {
 }
 
 export function extractJson(text) {
-  const t = String(text || "").trim();
-  try { return JSON.parse(t); } catch {}
-  const m = t.match(/\{[\s\S]*\}/);
-  if (!m) throw new Error("no json");
-  return JSON.parse(m[0]);
+  let t = String(text || "").replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/```(?:json)?/gi, "").trim();
+  try { const v = JSON.parse(t); if (v && typeof v === "object") return v; } catch {}
+  // erstes ausgewogenes {...} suchen (string-sicher), damit Fließtext/Klammern davor oder danach nicht stören
+  for (let start = t.indexOf("{"); start !== -1; start = t.indexOf("{", start + 1)) {
+    let depth = 0, inStr = false, esc = false;
+    for (let i = start; i < t.length; i++) {
+      const c = t[i];
+      if (inStr) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false; continue; }
+      if (c === '"') inStr = true; else if (c === "{") depth++; else if (c === "}" && --depth === 0) {
+        try { const v = JSON.parse(t.slice(start, i + 1)); if (v && typeof v === "object") return v; } catch {}
+        break;
+      }
+    }
+  }
+  throw new Error("no json");
 }
+
 // Modellwahl: AI_MODEL (fest) oder automatisch das beste verfügbare Chat-Modell des Anbieters (Modelle wechseln oft).
 const PREFERRED = ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "meta-llama/llama-4-maverick-17b-128e-instruct", "meta-llama/llama-4-scout-17b-16e-instruct", "llama-3.1-8b-instant", "openai/gpt-oss-120b", "openai/gpt-oss-20b"];
 const EXCLUDE = /whisper|guard|tts|playai|embed|vision|compound|moderation|orpheus|transcri|speech|image/i;
@@ -104,17 +115,19 @@ export async function callModel(task, payload, env = process.env) {
   const messages = [{role: "system", content: TASKS[task].system}, {role: "user", content: "Datenblock:\n" + JSON.stringify(payload)}];
   const redact = t => String(t || "").split(env.AI_API_KEY).join("…").slice(0, 160);
   let last = null;
-  // Versuch 1 mit JSON-Modus, Versuch 2 ohne (manche Modelle/Anbieter lehnen response_format ab; der Prompt verlangt JSON ohnehin)
-  for (const jsonMode of [true, false]) {
-    const body = {model, messages, temperature: 0.3, max_tokens: TASKS[task].max_tokens};
+  const reasoning = /gpt-oss|qwen3|deepseek-r1|reasoning|-r1|thinking/i.test(model);
+  // Versuch 1 mit JSON-Modus, Versuch 2 ohne (manche Modelle/Anbieter lehnen response_format ab) und mit mehr Platz (Antwort evtl. abgeschnitten)
+  for (const [jsonMode, mult] of [[true, reasoning ? 3 : 1.3], [false, reasoning ? 5 : 2.5]]) {
+    const body = {model, messages, temperature: 0.3, max_tokens: Math.round(TASKS[task].max_tokens * mult)};
     if (jsonMode) body.response_format = {type: "json_object"};
     const r = await timedFetch(`${base}/chat/completions`, {method: "POST", headers: {"content-type": "application/json", authorization: `Bearer ${env.AI_API_KEY}`}, body: JSON.stringify(body)});
     if (r.status === 429) { const e = new Error("KI-Anbieter ausgelastet, bitte später erneut versuchen."); e.status = 429; throw e; }
     if (!r.ok) { let msg = ""; try { const j = await r.json(); msg = (j.error && (j.error.message || j.error)) || ""; } catch {} last = {status: r.status, msg: redact(typeof msg === "string" ? msg : JSON.stringify(msg))}; continue; }
-    const j = await r.json();
-    try { return extractJson(j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content); } catch { last = {status: 200, msg: "Antwort war kein gültiges JSON"}; }
+    const j = await r.json(), choice = (j.choices && j.choices[0]) || {}, content = (choice.message && choice.message.content) || "";
+    try { return extractJson(content); }
+    catch { last = {status: 200, msg: redact(`Modell ${model}, finish_reason=${choice.finish_reason || "?"}, ${content.length} Zeichen${content ? `, Anfang: "${content.slice(0, 60).replace(/\s+/g, " ")}"` : ""}`)}; }
   }
-  const e = new Error(last && last.status === 200 ? "KI-Antwort war nicht verwertbar." : `KI-Anbieter nicht erreichbar (HTTP ${last ? last.status : "?"}${last && last.msg ? ": " + last.msg : ""}).`);
+  const e = new Error(last && last.status === 200 ? `KI-Antwort war nicht verwertbar (${last.msg}).` : `KI-Anbieter nicht erreichbar (HTTP ${last ? last.status : "?"}${last && last.msg ? ": " + last.msg : ""}).`);
   e.status = 502; throw e;
 }
 

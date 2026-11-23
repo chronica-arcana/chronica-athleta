@@ -10,9 +10,14 @@ const call = async (env, {method = "POST", headers = {}, body, url = "/api/ai"} 
   await handler(req, res, env); return out;
 };
 
-test("extractJson toleriert Text um das JSON", () => {
+test("extractJson toleriert Text, Markdown-Blöcke, Denk-Abschnitte und Klammern im Text", () => {
   assert.deepEqual(extractJson('Hier: {"a":1} fertig'), {a: 1});
-  assert.throws(() => extractJson("kein json"));
+  assert.deepEqual(extractJson('```json\n{"a":{"b":[1,2]},"s":"x}y"}\n```'), {a: {b: [1, 2]}, s: "x}y"});
+  assert.deepEqual(extractJson('<think>ich überlege {kurz}</think>{"ok":true}'), {ok: true});
+  assert.deepEqual(extractJson('Beispiel {kein json} und dann {"a":2} und {"b":3}'), {a: 2}, "überspringt ungültige Klammern");
+  assert.deepEqual(extractJson('{"text":"Anführungszeichen \\" und } darin"}'), {text: 'Anführungszeichen " und } darin'});
+  assert.throws(() => extractJson("kein json")); assert.throws(() => extractJson('{"abgeschnitten": "text'));
+  assert.throws(() => extractJson(""));
 });
 test("Prompts: nur feste Aufgaben, Datenblock wird als Daten gekennzeichnet", () => {
   assert.deepEqual(Object.keys(TASKS).sort(), ["followups", "parse_goal", "plan_summary", "session_feedback"]);
@@ -84,4 +89,29 @@ test("Modellwahl: bevorzugt bekannte Chat-Modelle, ignoriert Audio/Guard, respek
   try { assert.equal(await resolveModel({AI_API_KEY: "key-abc123", AI_BASE_URL: `http://127.0.0.1:${srv.address().port}/v1`}), "llama-3.1-8b-instant"); }
   finally { srv.close(); }
   assert.equal(await resolveModel({AI_API_KEY: "x", AI_BASE_URL: "http://127.0.0.1:9/v1"}), "llama-3.3-70b-versatile", "Fallback, wenn Modellliste nicht abrufbar");
+});
+
+test("Unbrauchbare KI-Antworten: Retry mit mehr Platz, Diagnose in der Fehlermeldung", async () => {
+  let calls = [], mode = "empty";
+  const llm = await server((q, r) => { let b = ""; q.on("data", c => b += c); q.on("end", () => {
+    r.setHeader("content-type", "application/json");
+    if (q.method === "GET") return r.end(JSON.stringify({data: [{id: "openai/gpt-oss-20b"}]}));
+    const j = JSON.parse(b); calls.push({max: j.max_tokens, rf: !!j.response_format});
+    if (mode === "empty") return r.end(JSON.stringify({choices: [{finish_reason: "length", message: {content: ""}}]}));
+    if (mode === "second") return r.end(JSON.stringify({choices: [{message: {content: calls.length === 1 ? "Gerne! Hier der Plan" : 'Gerne:\n```json\n{"title":"Ok"}\n```'}}]}));
+  }); });
+  const env = {AI_API_KEY: "key-abcdef", AI_BASE_URL: `http://127.0.0.1:${llm.address().port}/v1`, AI_MODEL: "openai/gpt-oss-20b"};
+  try {
+    const sb = await server((q, r) => { r.setHeader("content-type", "application/json"); if (q.url.includes("/auth/")) r.end('{"id":"u"}'); else r.end("1"); });
+    const full = {...env, SUPABASE_URL: `http://127.0.0.1:${sb.address().port}`, SUPABASE_ANON_KEY: "a", SUPABASE_SERVICE_ROLE_KEY: "s", AI_DAILY_LIMIT: "100"};
+    mode = "empty"; calls = [];
+    let out = await call(full, {headers: {authorization: "Bearer g"}, body: {task: "plan_summary", payload: {}}});
+    assert.equal(out.status, 502); assert.match(out.body.error, /nicht verwertbar \(Modell openai\/gpt-oss-20b, finish_reason=length, 0 Zeichen\)/);
+    assert.equal(calls.length, 2); assert.ok(calls[1].max > calls[0].max, "zweiter Versuch mit mehr Token"); assert.equal(calls[1].rf, false);
+    assert.ok(calls[0].max >= 1800, "Reasoning-Modelle bekommen großzügig Token");
+    mode = "second"; calls = [];
+    out = await call(full, {headers: {authorization: "Bearer g"}, body: {task: "plan_summary", payload: {}}});
+    assert.equal(out.status, 200); assert.deepEqual(out.body.data, {title: "Ok"});
+    sb.close();
+  } finally { llm.close(); }
 });
