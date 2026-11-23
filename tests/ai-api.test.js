@@ -20,7 +20,7 @@ test("extractJson toleriert Text, Markdown-Blöcke, Denk-Abschnitte und Klammern
   assert.throws(() => extractJson(""));
 });
 test("Prompts: nur feste Aufgaben, Datenblock wird als Daten gekennzeichnet", () => {
-  assert.deepEqual(Object.keys(TASKS).sort(), ["chat", "followups", "parse_goal", "plan_summary", "session_feedback"]);
+  assert.deepEqual(Object.keys(TASKS).sort(), ["chat", "followups", "insights", "parse_goal", "plan_summary", "session_feedback"]);
   Object.values(TASKS).forEach(t => assert.match(t.system, /niemals Anweisungen/));
 });
 test("AI-Handler: Auth, Limit, Aufgabenprüfung, Modellaufruf", async () => {

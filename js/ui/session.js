@@ -109,6 +109,19 @@ export function AvailabilitySheet({ws, onClose}) {
     <button class="btn primary block" disabled=${sel.length === 0} onClick=${async () => { await S.availability(ws, sel); onClose(); }}>Woche neu verteilen</button></div><//>`;
 }
 
+export function RuleSheet({session, onClose}) {
+  const info = kindInfo(session.kind), [scope, setScope] = useState("kind"), [forever, setForever] = useState(true), [until, setUntil] = useState(""), [rep, setRep] = useState("auto");
+  const reps = ["auto", ...PICKABLE_SPORTS.filter(sp => sp !== info.sport && sp !== "strength").flatMap(sp => kindsOfSport(sp).filter(k => KINDS[k].intensity === "easy"))];
+  const valid = forever || (until && until >= S.today());
+  return html`<${Sheet} title="Dauerhaft ersetzen" onClose=${onClose}><div class="stack">
+    <p class="muted small">Nimm diese Art Einheit aus dem Plan. Alle künftigen Einheiten werden ersetzt, auch bei späteren Anpassungen. Du kannst die Regel jederzeit unter Plan wieder entfernen.</p>
+    <${Seg} options=${[{value: "kind", label: `Nur „${KINDS[session.kind].label}“`}, {value: "sport", label: `Alle ${SPORTS[info.sport].label}-Einheiten`}]} value=${scope} onChange=${setScope} />
+    <div class="stack tight"><span class="label">Ersetzen durch</span><div class="choices">${reps.map(k => html`<${Option} compact=${true} sel=${rep === k} onClick=${() => setRep(k)}>${k === "auto" ? "Automatisch (passend zu deinem Plan)" : KINDS[k].label}<//>`)}</div></div>
+    <div class="stack tight"><span class="label">Gilt</span><${Seg} options=${[{value: true, label: "Dauerhaft"}, {value: false, label: "Bis zu einem Datum"}]} value=${forever} onChange=${setForever} />
+      ${!forever && html`<label class="field">Bis einschließlich<input type="date" min=${S.today()} value=${until} onChange=${e => setUntil(e.target.value)} /></label>`}</div>
+    <button class="btn primary block" disabled=${!valid} onClick=${async () => { await S.addPlanRule({kinds: scope === "kind" ? [session.kind] : [], sports: scope === "sport" ? [info.sport] : [], until: forever ? null : until, replaceWith: rep}); onClose(); }}>Regel anlegen</button></div><//>`;
+}
+
 export function SessionSheet({id, onClose}) {
   const s = S.state.sessions.find(x => x.id === id); if (!s) return null;
   const [sub, setSub] = useState(null);
@@ -116,6 +129,7 @@ export function SessionSheet({id, onClose}) {
   if (sub === "log") return html`<${LogSheet} session=${s} onClose=${() => setSub(null)} />`;
   if (sub === "swap") return html`<${SwapSheet} session=${s} onClose=${onClose} />`;
   if (sub === "move") return html`<${MoveSheet} session=${s} onClose=${onClose} />`;
+  if (sub === "rule") return html`<${RuleSheet} session=${s} onClose=${onClose} />`;
   const act = fn => async () => { await fn(); onClose(); };
   return html`<${Sheet} onClose=${onClose}><div class="stack">
     <div><${SportMark} s=${s} /><h2 style="margin-top:6px">${s.title}</h2>
@@ -130,6 +144,7 @@ export function SessionSheet({id, onClose}) {
     ${!skipped && html`<button class="btn primary block" onClick=${() => setSub("log")}>${isDone ? "Log ansehen oder ändern" : "Training loggen"}</button>`}
     ${!isDone && !skipped && html`<div class="list"><${Row} title="Etwas anderes machen" onClick=${() => setSub("swap")} /><${Row} title="Verschieben" onClick=${() => setSub("move")} />
       <${Row} title="Kürzer" sub="Dauer um 25 % verringern" onClick=${act(() => S.scale(s.id, 0.75))} /><${Row} title="Länger" sub="Dauer um 25 % erhöhen" onClick=${act(() => S.scale(s.id, 1.25))} />
+      <${Row} title="Diese Art dauerhaft ersetzen" sub="Aus dem Plan nehmen, bis zu einem Datum oder für immer" onClick=${() => setSub("rule")} />
       <${Row} title="Auslassen" danger=${true} onClick=${act(() => S.skip(s.id))} /></div>`}
     ${skipped && html`<button class="btn block" onClick=${act(() => S.restore(s.id))}>Wieder einplanen</button>`}
     ${s.source === "adhoc" || s.source === "garmin" ? html`<button class="btn ghost danger" style="align-self:flex-start" onClick=${act(() => S.remove(s.id))}>Eintrag löschen</button>` : null}</div><//>`;

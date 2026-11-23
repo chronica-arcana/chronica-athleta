@@ -5,6 +5,7 @@ import {AuthScreen, RecoveryScreen} from "./ui/auth.js";
 import {Wizard} from "./ui/wizard.js";
 import {Today, Plan, Progress, Profile} from "./ui/views.js";
 import {Chat} from "./ui/chat.js";
+import {InsightsSheet} from "./ui/insights.js";
 import {SessionSheet, LogSheet, SwapSheet, MoveSheet, AddSheet, AvailabilitySheet} from "./ui/session.js";
 
 const TABS = [["today", "home", "Heute"], ["plan", "calendar", "Plan"], ["progress", "chart", "Fortschritt"], ["coach", "chat", "Coach"], ["profile", "user", "Profil"]];
@@ -13,7 +14,9 @@ function App() {
   const [, force] = useReducer(x => x + 1, 0);
   useEffect(() => { const off = S.subscribe(force); force(); return off; }, []);
   const [tab, setTab] = useState("today"), [sheet, setSheet] = useState(null), [wizard, setWizard] = useState(false), [wizardSeen, setWizardSeen] = useState(false);
-  const st = S.state;
+  const st = S.state, [insightShown, setInsightShown] = useState(false);
+  // Nach jeweils 5 erledigten Einheiten einmal pro App-Sitzung automatisch die Empfehlungen zeigen
+  useEffect(() => { if (st.phase === "app" && !insightShown && !sheet && !wizard && S.insightsDue()) { setInsightShown(true); setSheet({type: "insights"}); } });
   const open = (id, sub) => { if (sub === "log") setSheet({type: "log", id}); else if (sub === "swap") setSheet({type: "swap", id}); else if (sub === "move") setSheet({type: "move", id}); else setSheet({type: "session", id}); };
   const close = () => setSheet(null);
   if (st.recovering) return html`<${RecoveryScreen} onDone=${force} /><${Toasts} items=${st.toasts} />`;
@@ -37,6 +40,7 @@ function App() {
     ${sheet && sheet.type === "swap" && sess && html`<${SwapSheet} session=${sess} onClose=${close} />`}
     ${sheet && sheet.type === "move" && sess && html`<${MoveSheet} session=${sess} onClose=${close} />`}
     ${sheet && sheet.type === "add" && html`<${AddSheet} date=${sheet.date} onClose=${close} />`}
+    ${sheet && sheet.type === "insights" && html`<${InsightsSheet} onClose=${() => { S.markInsightsSeen(); close(); }} onDiscuss=${() => { S.markInsightsSeen(); S.state.chatPrefill = "Erkläre mir meine Zwischenbilanz und was ich als Nächstes konkret ändern sollte."; close(); setTab("coach"); }} />`}
     ${sheet && sheet.type === "avail" && html`<${AvailabilitySheet} ws=${sheet.ws} onClose=${close} />`}
     ${showWizard && html`<${Wizard} first=${needsPlan} onClose=${closeWizard} />`}
     <${Toasts} items=${st.toasts} /></div>`;

@@ -11,12 +11,19 @@ const BASE = `Du bist ein erfahrener, vorsichtiger Trainingscoach (Ausdauer, Kra
 const CHAT_KINDS = "run_easy, run_long, run_tempo, run_intervals, bike_easy, bike_long, bike_tempo, bike_intervals, swim_technique, swim_endurance, swim_intervals, strength_full, strength_lower, strength_upper, strength_core, football_skills, football_conditioning, team_match, cardio_easy, cardio_intervals, mobility, walk";
 
 export const TASKS = {
+  insights: {
+    max_tokens: 500,
+    system: `${BASE}
+Aufgabe: Fasse die regelbasierten Empfehlungen (Feld "empfehlungen") für den Nutzer zusammen und gib einen konkreten Fokus für die nächsten zwei Wochen. Beziehe dich nur auf Zahlen und Aussagen im Datenblock, erfinde nichts. Du-Form, freundlich und sachlich, keine medizinischen Aussagen. Bei Beschwerden: nichts steigern und Fachperson fragen.
+Format: {"headline":"eine Zeile, höchstens 70 Zeichen","focus":"2 bis 3 Sätze: worauf in den nächsten zwei Wochen der Schwerpunkt liegt","next_steps":["höchstens 3 kurze, konkrete Schritte"]}`
+  },
   chat: {
     max_tokens: 900,
     system: `${BASE}
 Aufgabe: Du bist der persönliche Trainings-Coach in der App. Beantworte die Frage im Feld "frage" knapp, konkret und ehrlich zu Training, Erholung, Technik, Plan, allgemeiner Ernährung und Garmin-Werten. Nutze den Kontext (Ziel, Plan, nächste und letzte Einheiten, Erholung, Belastung, VO2max, Kraftziele) und beziehe dich auf konkrete Zahlen daraus. Frage "verlauf" ist der bisherige Chat. Keine Diagnosen und keine medizinischen Freigaben; bei Schmerzen oder Verletzungsverdacht rate zu Arzt oder Sportphysio und nicht zu Steigerungen. Wenn eine Planänderung sinnvoll ist, schlage sie vor, ändere aber nichts selbst. Keine Erfindungen: Fehlen Daten, sage das.
-Format: {"reply":"Antwort, höchstens ca. 120 Wörter, Absätze mit \n\n","actions":[{"type":"swap|skip|scale|move_today","label":"kurze Beschriftung","kind":"nur bei swap, eine von: ${CHAT_KINDS}","factor":"nur bei scale, 0.6 bis 1.25"}]}
-"actions" ist optional, höchstens 2 Einträge, nur für die NÄCHSTE geplante Einheit und nur wenn wirklich sinnvoll.`
+Wenn der Nutzer eine Art von Einheit DAUERHAFT oder bis zu einem Datum nicht mehr im Plan haben möchte (z. B. "kein echtes Fußballtraining bis Februar"), schlage genau eine rule-Aktion vor: "kinds" nur aus artenImPlan[].art (alle passenden Arten der Sportart nennen), "until" als YYYY-MM-DD (aus dem Gesagten ableiten, "bis Februar" = 01.02. des passenden Jahres; null = dauerhaft), "replace" = "auto" oder eine Art aus der Liste. Nenne im reply, was genau ersetzt wird und bis wann.
+Format: {"reply":"Antwort, höchstens ca. 120 Wörter, Absätze mit \n\n","actions":[{"type":"swap|skip|scale|move_today|rule","label":"kurze Beschriftung","kind":"nur bei swap, eine von: ${CHAT_KINDS}","factor":"nur bei scale, 0.6 bis 1.25","kinds":["nur bei rule"],"until":"nur bei rule: YYYY-MM-DD oder null","replace":"nur bei rule: auto oder eine Art"}]}
+"actions" ist optional, höchstens 2 Einträge. swap/skip/scale/move_today gelten nur für die NÄCHSTE geplante Einheit; rule gilt für den ganzen Plan. Nur Vorschläge, wenn wirklich sinnvoll.`
   },
   parse_goal: {
     max_tokens: 600,

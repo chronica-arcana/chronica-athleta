@@ -1,8 +1,11 @@
 import {html, useState, useEffect, useRef} from "../../vendor/preact-htm.js";
 import {Icon, Spinner} from "./common.js";
 import * as S from "../store.js";
+import {KINDS, SPORTS} from "../../engine/catalog.js";
+import {fmtDay} from "../../engine/dates.js";
 
 const SUGGESTIONS = ["Was soll ich heute trainieren?", "Wie viel Pause brauche ich nach einer harten Einheit?", "Ist mein Plan gerade zu anspruchsvoll?", "Wie kann ich meine VO₂max verbessern?"];
+const ruleText = a => `Ersetzt ${a.kinds && a.kinds.length ? a.kinds.map(k => KINDS[k] ? KINDS[k].label : k).join(", ") : (a.sports || []).map(s => SPORTS[s].label + "-Einheiten").join(", ")} ${a.until ? "bis " + fmtDay(a.until) + " " + a.until.slice(0, 4) : "dauerhaft"} durch ${a.replace === "auto" ? "passende Alternativen aus deinem Plan" : KINDS[a.replace].label}.`;
 const keyFor = uid => "tt2_chat_" + uid;
 const load = uid => { try { const v = JSON.parse(localStorage.getItem(keyFor(uid))); return Array.isArray(v) ? v : []; } catch { return []; } };
 const store = (uid, msgs) => { try { localStorage.setItem(keyFor(uid), JSON.stringify(msgs.slice(-40))); } catch {} };
@@ -11,6 +14,7 @@ let seq = 1;
 export function Chat() {
   const enabled = S.aiAvailable(), uid = (S.state.user && S.state.user.id) || "demo";
   const [msgs, setMsgs] = useState(() => load(uid)), [text, setText] = useState(""), [busy, setBusy] = useState(false), endRef = useRef(null);
+  useEffect(() => { if (S.state.chatPrefill && enabled) { const q = S.state.chatPrefill; S.state.chatPrefill = null; send(q); } }, []);
   useEffect(() => { store(uid, msgs); if (endRef.current) endRef.current.scrollIntoView({block: "end"}); }, [msgs, busy]);
   const send = async (q, base = msgs) => {
     q = String(q || "").trim(); if (!q || busy) return;
@@ -32,7 +36,7 @@ export function Chat() {
         ${msgs.length === 0 && html`<div class="stack"><p class="muted">Frag mich zu deinem Training, deiner Erholung oder deinem Plan. Ich kenne deine nächsten Einheiten, deine letzten Trainings und deine Garmin-Werte.</p>
           <div class="choices">${SUGGESTIONS.map(s => html`<button class="opt compact" onClick=${() => send(s)}><span class="grow">${s}</span><${Icon} name="chevR" size=${16} /></button>`)}</div></div>`}
         ${msgs.map(m => html`<div class=${"msg " + m.role} key=${m.id}><div class=${"bubble " + m.role + (m.error ? " err" : "")}>${m.text.split(/\n\n+/).map(p => html`<p>${p}</p>`)}</div>
-          ${m.actions && m.actions.length > 0 && html`<div class="row wrap">${m.actions.map((a, i) => m.applied && m.applied[i] ? html`<span class="tag good">${a.label} · übernommen</span>` : html`<button class="btn sm" onClick=${() => apply(m, i)}>${a.label}</button>`)}</div>`}
+          ${m.actions && m.actions.length > 0 && html`<div class="stack tight">${m.actions.map((a, i) => html`<div class="stack tight">${m.applied && m.applied[i] ? html`<span class="tag good" style="align-self:flex-start">${a.label} · übernommen</span>` : html`<button class="btn sm" style="align-self:flex-start" onClick=${() => apply(m, i)}>${a.label}</button>`}${a.type === "rule" && !(m.applied && m.applied[i]) && html`<span class="tiny muted">${ruleText(a)}</span>`}</div>`)}</div>`}
           ${m.retry && html`<button class="btn sm" onClick=${() => { const i = msgs.findIndex(x => x.id === m.id), base = msgs.slice(0, msgs[i - 1] && msgs[i - 1].role === "user" ? i - 1 : i); send(m.retry, base); }}>Erneut versuchen</button>`}</div>`)}
         ${busy && html`<div class="msg coach"><div class="bubble coach"><${Spinner} /></div></div>`}
         <div ref=${endRef}></div>

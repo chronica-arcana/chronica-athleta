@@ -3,7 +3,7 @@
 // Der Aufrufer speichert das Ergebnis. Kernidee: Der Plan ist kein starres Gerüst, sondern ein Wochenlast-Ziel,
 // auf das sich die restlichen Einheiten der Woche nach jeder Änderung (tauschen, verschieben, auslassen,
 // zusätzlich trainieren, nicht verfügbar) automatisch neu einstellen.
-import {kindInfo, DOWNGRADE, KINDS} from "./catalog.js";
+import {kindInfo, DOWNGRADE, KINDS, SPORTS} from "./catalog.js";
 import {buildSession, round5} from "./content.js";
 import {assignDays, trimToFit} from "./planner.js";
 import {addDays, weekStart, diffDays, uuid, dow} from "./dates.js";
@@ -119,12 +119,63 @@ function scaleWeek(w, ws, today) {
   }
 }
 
+/* ---------- Dauerhafte Regeln ("diese Art Einheit nicht, bis Datum X") ---------- */
+const matchRule = (r, kind, date) => ((r.kinds || []).includes(kind) || (r.sports || []).includes(kindInfo(kind).sport)) && (!r.until || date <= r.until);
+const AUTO_REPLACE = {run: "run_easy", bike: "bike_easy", swim: "swim_technique", cardio: "cardio_easy", walk: "walk", mobility: "mobility", strength: "strength_core"};
+export function replacementFor(plan, r, s) {
+  const excluded = new Set([...(r.sports || []), ...(r.kinds || []).map(k => kindInfo(k).sport)]), cand = [];
+  if (r.replaceWith && r.replaceWith !== "auto") cand.push(r.replaceWith);
+  ((plan.goal && plan.goal.sports) || []).filter(sp => !excluded.has(sp) && AUTO_REPLACE[sp]).forEach(sp => cand.push(AUTO_REPLACE[sp]));
+  cand.push("cardio_easy", "mobility");
+  return cand.find(k => KINDS[k] && !matchRule(r, k, s.date));
+}
+function enforceRules(w, today) {
+  const rules = (w.P.meta.rules || []).filter(r => !r.until || r.until >= today);
+  if (!rules.length) return;
+  const counts = new Map();
+  for (const s of w.list()) {
+    if (s.status !== "planned" || s.date < today || s.source !== "plan" || s.kind === "event") continue; // vom Nutzer gewählte Einheiten bleiben unberührt
+    const r = rules.find(x => matchRule(x, s.kind, s.date)); if (!r) continue;
+    const to = replacementFor(w.P, r, s); if (!to) continue;
+    if (!s.origKind) s.origKind = s.kind;
+    s.kind = to; s.ruleId = r.id; s.title = KINDS[to].label; s.locked = false; ensureBase(s);
+    if (kindInfo(to).key) s.priority = "key"; else if (s.priority === "key") s.priority = "support";
+    s.addon = undefined; rebuild(w, s, s.durationMin); counts.set(r.id, (counts.get(r.id) || 0) + 1);
+  }
+  for (const [id, n] of counts) { const r = rules.find(x => x.id === id); w.note(`${n} künftige Einheit${n === 1 ? "" : "en"} wegen der Regel „${r.label}“ ersetzt.`); }
+}
+export function addRule(plan, sessions, rule, today) {
+  const w = work(plan, sessions), kinds = (rule.kinds || []).filter(k => KINDS[k]), sports = (rule.sports || []).filter(sp => SPORTS_OK.has(sp));
+  if (!kinds.length && !sports.length) return finish(w);
+  const until = /^\d{4}-\d{2}-\d{2}$/.test(rule.until || "") ? rule.until : null;
+  const names = kinds.length ? kinds.map(k => KINDS[k].label).join(", ") : sports.map(sp => SPORTS[sp] ? SPORTS[sp].label : sp).join(", ");
+  const r = {id: uuid(), kinds, sports, until, replaceWith: rule.replaceWith && KINDS[rule.replaceWith] ? rule.replaceWith : "auto", label: rule.label || `${names} ${until ? "bis " + until.slice(8) + "." + until.slice(5, 7) + "." + until.slice(0, 4) : "dauerhaft nicht"}`.slice(0, 90), createdAt: new Date().toISOString()};
+  w.P.meta.rules = [...(w.P.meta.rules || []), r];
+  rebalance(null, null, today, {_w: w});
+  if (!w.notes.some(n => /ersetzt/.test(n))) w.note("Regel gespeichert. Aktuell sind keine Einheiten betroffen; sie gilt auch für künftige Anpassungen.");
+  return finish(w);
+}
+export function removeRule(plan, sessions, ruleId, today) {
+  const w = work(plan, sessions); let n = 0;
+  w.P.meta.rules = (w.P.meta.rules || []).filter(r => r.id !== ruleId);
+  for (const s of w.list()) if (s.ruleId === ruleId) {
+    if (s.status === "planned" && s.origKind && KINDS[s.origKind]) { s.kind = s.origKind; s.title = KINDS[s.kind].label; ensureBase(s); rebuild(w, s, s.durationMin); n++; }
+    s.ruleId = undefined; s.origKind = undefined; w.touch(s.id);
+  }
+  w.note(n ? `Regel entfernt, ${n} Einheit${n === 1 ? "" : "en"} wiederhergestellt.` : "Regel entfernt.");
+  rebalance(null, null, today, {_w: w});
+  return finish(w);
+}
+const SPORTS_OK = new Set(["run", "bike", "swim", "strength", "football", "cardio", "mobility", "walk"]);
+
 export function rebalance(plan, sessions, today, opts = {}) {
   const w = opts._w || work(plan, sessions);
+  enforceRules(w, today);
   enforceSpacing(w, today);
   placeDebt(w, today);
   const weeks = [...new Set(w.list().filter(s => s.status === "planned" && s.date >= today).map(s => weekStart(s.date)))].sort();
   weeks.forEach(ws => scaleWeek(w, ws, today));
+  enforceRules(w, today); // Entschärfung/Verschiebung darf keine ausgeschlossene Art wieder einsetzen
   return opts._w ? w : finish(w);
 }
 

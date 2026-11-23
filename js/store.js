@@ -6,6 +6,7 @@ import {recoveryFlags, activityFlags, matchActivities, importSuggestions, normal
 import {readiness} from "../engine/readiness.js";
 import {computeStats} from "../engine/stats.js";
 import {sanitizeChat, buildChatContext} from "../engine/chat.js";
+import {computeInsights, roundsDue} from "../engine/insights.js";
 import {applyReadiness, importGarminActivities} from "../engine/auto.js";
 import {kindInfo, SPORTS, PICKABLE_SPORTS} from "../engine/catalog.js";
 import {todayISO, uuid, addDays, weekStart} from "../engine/dates.js";
@@ -229,14 +230,28 @@ export async function autoSync({force = false} = {}) {
   state.syncing = false; emit();
 }
 
+/* ---------- Empfehlungen (ab 5 Einheiten, danach alle 5) ---------- */
+export const doneCount = () => state.sessions.filter(s => s.status === "done").length;
+export const getInsights = () => computeInsights({sessions: state.sessions, garmin: state.garmin, plan: activePlan(), today: today()});
+export const insightsDue = () => activePlan() ? roundsDue(doneCount(), state.settings.insightsRound) : 0;
+export const markInsightsSeen = () => setSettings({insightsRound: Math.floor(doneCount() / 5)});
+export async function insightsFocus(items) {
+  const p = activePlan(), g = (p && p.goal) || {}, cut = (v, n) => String(v ?? "").slice(0, n);
+  const out = await ai("insights", {anzahlEinheiten: doneCount(), ziel: {modus: g.mode, niveau: g.level, sportarten: g.sports, beschwerden: !!g.injury}, empfehlungen: items.map(i => ({bereich: i.area, titel: i.title, text: i.text, ton: i.tone}))});
+  return {headline: cut(out.headline, 90), focus: cut(out.focus, 500), steps: (Array.isArray(out.next_steps) ? out.next_steps : []).slice(0, 3).map(x => cut(x, 140))};
+}
+
 /* ---------- Coach-Chat ---------- */
 export const chatContext = () => buildChatContext({plan: activePlan(), sessions: planSessions(), rd: getReadiness(), stats: computeStats({sessions: state.sessions, garmin: state.garmin, today: today()}), today: today()});
+export const addPlanRule = rule => run((p, s) => A.addRule(p, s, rule, today()));
+export const removePlanRule = id => run((p, s) => A.removeRule(p, s, id, today()));
 export async function askCoach(history, question) {
   const out = await ai("chat", {kontext: chatContext(), verlauf: history.slice(-8).map(m => ({rolle: m.role === "user" ? "Nutzer" : "Coach", text: String(m.text).slice(0, 600)})), frage: String(question).slice(0, 500)});
-  return sanitizeChat(out);
+  return sanitizeChat(out, today());
 }
 // Vorgeschlagene Änderung der nächsten Einheit ausführen (erst nach Bestätigung durch den Nutzer)
 export async function applyChatAction(a) {
+  if (a.type === "rule") return addPlanRule({kinds: a.kinds, sports: a.sports, until: a.until, replaceWith: a.replace, label: a.label});
   const next = nextSession(); if (!next) throw new Error("Es ist keine kommende Einheit geplant.");
   if (a.type === "swap") return swap(next.id, a.kind);
   if (a.type === "skip") return skip(next.id);

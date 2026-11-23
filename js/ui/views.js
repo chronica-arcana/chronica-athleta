@@ -6,6 +6,7 @@ import {fmtShort, fmtDay, addDays, weekStart, DAY_SHORT, dow, diffDays, DAY_LONG
 import {recoveryFlags, sportOfActivity} from "../../engine/garmin.js";
 import {computeStats} from "../../engine/stats.js";
 import {computeAwards} from "../../engine/awards.js";
+import {InsightsList} from "./insights.js";
 
 const weekOf = (plan, t) => Math.floor(diffDays(weekStart(t), weekStart(plan.startDate)) / 7);
 const phaseAt = (plan, idx) => plan.meta.phases.find(p => idx >= p.fromWeek && idx <= p.toWeek) || plan.meta.phases[plan.meta.phases.length - 1];
@@ -113,6 +114,7 @@ export function Plan({onOpen, onAdd, onAvail, onWizard}) {
       <div class="card stack"><div class="row between"><div><div class="bold">Diese Woche</div><div class="tiny muted">${fmtDay(ws)} – ${fmtDay(addDays(ws, 6))} · ${ph.name}</div></div><button class="btn sm" onClick=${() => onAvail(ws)}>Woche anpassen</button></div><${Meter} ...${lw} /></div>
       <div class="stack"><span class="label" style="margin-bottom:-4px">Vergangen</span>${pgroups.length ? pgroups.map(g => rows(g, false)) : html`<div class="note">Noch keine vergangenen Einheiten.</div>`}
         ${pastAll.length > 8 && html`<button class="btn block" onClick=${() => setAllPast(!allPast)}>${allPast ? "Weniger anzeigen" : `Alle ${pastAll.length} anzeigen`}</button>`}</div>
+      ${(plan.meta.rules || []).length > 0 && html`<div class="section"><span class="label">Dauerhafte Änderungen</span><div class="list">${plan.meta.rules.map(r => html`<div class="li"><div class="grow"><div class="t">${r.label}</div><div class="s">${r.until ? "gilt bis " + fmtDay(r.until) + " " + r.until.slice(0, 4) : "gilt dauerhaft"}</div></div><button class="btn sm" onClick=${() => S.removePlanRule(r.id)}>Entfernen</button></div>`)}</div></div>`}
       <details class="fold"><summary>Planübersicht<${Icon} name="chevD" size=${18} /></summary><div class="stack">
         ${plan.meta.coachSummary && html`<div class="stack tight"><span class="label">Coach</span><p class="small">${plan.meta.coachSummary}</p></div>`}
         ${plan.meta.warnings.map(w => html`<div class="note warn">${w}</div>`)}
@@ -144,6 +146,7 @@ export function Progress({onWizard}) {
   const stat = (k, v, d) => html`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d || "\u00a0"}</div></div>`;
   return html`<div class="screen stack gap-lg"><div><div class="eyebrow">${plan.title}</div><h1 style="margin-top:6px">Fortschritt</h1></div>
     <div class="cols"><div class="col stack gap-lg">
+      ${S.doneCount() >= 5 && html`<div class="section"><span class="label">Empfehlungen</span><${InsightsList} items=${S.getInsights()} /></div>`}
       <div class="card"><div class="stats">${stat("Einheiten", tot.count, `${tot.activeDays} ${tot.activeDays === 1 ? "aktiver Tag" : "aktive Tage"}`)}${stat("Trainingszeit", hours(tot.minutes), tot.longest ? "längste " + tot.longest + " Min" : "")}${stat("Distanz", tot.distance ? f1(tot.distance) + " km" : "–", "aus Logs und Garmin")}${stat("Serie", tot.streakDays, `${tot.streakWeeks} ${tot.streakWeeks === 1 ? "Woche" : "Wochen"} aktiv`)}</div></div>
       <div class="section"><span class="label">Letzte 4 Wochen</span><div class="list">
         <div class="li"><div class="grow"><div class="t">${c.cur.count} ${c.cur.count === 1 ? "Einheit" : "Einheiten"}</div><div class="s">${hours(c.cur.minutes)}${c.cur.distance ? " · " + f1(c.cur.distance) + " km" : ""}</div></div>${c.countDelta != null && html`<div class="center"><${Delta} v=${c.countDelta} /><div class="tiny faint">Einheiten</div></div>`}${c.minutesDelta != null && html`<div class="center"><${Delta} v=${c.minutesDelta} /><div class="tiny faint">Zeit</div></div>`}</div>
