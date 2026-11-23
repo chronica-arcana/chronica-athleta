@@ -1,5 +1,6 @@
 // Automatische Anpassungen auf Basis von Garmin-Daten: heutige Einheit nach Bereitschaft, Übernahme von Garmin-Aktivitäten.
-import {swapSession, scaleSession, completeSession, addSession} from "./adapt.js";
+import {swapSession, scaleSession, completeSession, addSession, skipSession} from "./adapt.js";
+import {addDays} from "./dates.js";
 import {kindInfo} from "./catalog.js";
 import {sportOfActivity, importSuggestions} from "./garmin.js";
 
@@ -28,6 +29,11 @@ export function applyReadiness(plan, sessions, today, rd) {
     } else continue;
     const mark = res.sessions.find(x => x.id === s.id); if (mark) mark.auto = {date: today, reason};
     cur = merge(cur, res); res.sessions.forEach(x => touched.set(x.id, x)); out.notes.push(...res.notes);
+    // Heute schon Yoga: das (automatisch geplante) Yoga der nächsten zwei Tage ist überflüssig
+    if (res.sessions.some(x => x.id === s.id && x.kind === "mobility")) {
+      const redundant = cur.sessions.find(x => x.status === "planned" && x.kind === "mobility" && !x.locked && x.id !== s.id && x.date > today && x.date <= addDays(today, 2));
+      if (redundant) { const r2 = skipSession(cur.plan, cur.sessions, redundant.id, today, "redundant"); cur = merge(cur, r2); r2.sessions.forEach(x => touched.set(x.id, x)); out.notes.push("Das geplante Yoga der nächsten Tage entfällt, weil heute schon Yoga ansteht."); }
+    }
   }
   out.plan = cur.plan; out.sessions = [...touched.values()].map(x => cur.sessions.find(y => y.id === x.id) || x);
   return out;
@@ -42,6 +48,7 @@ export function importGarminActivities(plan, sessions, activities, today, sinceD
     const match = cur.sessions.find(s => s.status === "planned" && s.date === a.date && s.sport === sport && !(s.log && s.log.garminActivityId));
     const res = match ? completeSession(cur.plan, cur.sessions, match.id, log, today)
       : addSession(cur.plan, cur.sessions, {date: a.date, kind: DEFAULT_KIND[sport] || "cardio_easy", minutes: Math.round(a.durationMin), done: true, source: "garmin", log}, today);
+    if (!match && a.name) { const added = res.sessions.find(x => x.log && x.log.garminActivityId === a.id); if (added) added.title = String(a.name).slice(0, 60); }
     cur = merge(cur, res); res.sessions.forEach(x => touched.set(x.id, x)); count++;
     notes.push(match ? `Garmin: „${match.title}“ am ${a.date.slice(8)}.${a.date.slice(5, 7)}. als erledigt übernommen.` : `Garmin: ${a.name || a.type} (${Math.round(a.durationMin)} Min) am ${a.date.slice(8)}.${a.date.slice(5, 7)}. übernommen, die Woche passt sich an.`);
   }

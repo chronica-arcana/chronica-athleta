@@ -4,6 +4,8 @@ import * as S from "../store.js";
 import {SPORTS, kindInfo} from "../../engine/catalog.js";
 import {fmtShort, fmtDay, addDays, weekStart, DAY_SHORT, dow, diffDays, DAY_LONG} from "../../engine/dates.js";
 import {recoveryFlags, sportOfActivity} from "../../engine/garmin.js";
+import {computeStats} from "../../engine/stats.js";
+import {computeAwards} from "../../engine/awards.js";
 
 const weekOf = (plan, t) => Math.floor(diffDays(weekStart(t), weekStart(plan.startDate)) / 7);
 const phaseAt = (plan, idx) => plan.meta.phases.find(p => idx >= p.fromWeek && idx <= p.toWeek) || plan.meta.phases[plan.meta.phases.length - 1];
@@ -125,30 +127,48 @@ function Spark({values, color = "var(--ink)", h = 34}) {
   return html`<svg viewBox=${`0 0 ${w} ${h}`} width="100%" height=${h} preserveAspectRatio="none" aria-hidden="true"><polyline fill="none" stroke=${color} stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points=${pts.map(p => p.join(",")).join(" ")} /></svg>`;
 }
 
+const f1 = n => String(Math.round(n * 10) / 10).replace(".", ",");
+const hours = m => f1(m / 60) + " h";
+const Delta = ({v, inverse}) => v == null ? null : html`<span class=${"tiny " + (v === 0 ? "muted" : (v > 0) !== !!inverse ? "c-good" : "c-warn")}>${v > 0 ? "+" : ""}${v} %</span>`;
+const fmtDate = d => `${+d.slice(8)}.${+d.slice(5, 7)}.`;
+
 export function Progress({onWizard}) {
   const plan = S.activePlan(); if (!plan) return html`<${Empty} onWizard=${onWizard} />`;
-  const sessions = S.planSessions(), t = S.today(), done = sessions.filter(s => s.status === "done");
-  const minutes = done.reduce((a, s) => a + (Number(s.log && s.log.durationMin) || s.durationMin), 0);
+  const t = S.today(), g = S.state.garmin, all = S.state.sessions, sessions = S.planSessions();
+  const st = computeStats({sessions: all, garmin: g, today: t}), awards = computeAwards({sessions: all, garmin: g, plans: S.state.plans, today: t});
   const first = weekStart(plan.startDate), cur = weekStart(t), n = Math.round(Math.min(12, Math.max(4, diffDays(cur, first) / 7 + 4)));
   const weeks = Array.from({length: n}, (_, i) => addDays(addDays(cur, 3 * 7), -(n - 1 - i) * 7)).filter(w => w >= first && w <= weekStart(plan.endDate));
   const data = weeks.map(w => ({w, ...weekLoads(plan, sessions, w)})), maxV = Math.max(1, ...data.map(d => Math.max(d.target, d.done)));
-  const bySport = {}; done.forEach(s => { bySport[s.sport] = (bySport[s.sport] || 0) + (Number(s.log && s.log.durationMin) || s.durationMin); });
-  const sportRows = Object.entries(bySport).sort((a, b) => b[1] - a[1]);
-  const streak = (() => { let c = 0, w = cur; if (!done.some(s => weekStart(s.date) === w)) w = addDays(w, -7); while (done.some(s => weekStart(s.date) === w)) { c++; w = addDays(w, -7); } return c; })();
-  const targets = Object.entries(plan.meta.targets || {}), daily = S.state.garmin.daily.slice(-21), due = sessions.filter(s => s.date < t || s.status === "done").length;
-  const W = 320, H = 120, bw = W / Math.max(1, data.length);
+  const sportRows = Object.entries(st.bySport).sort((a, b) => b[1].minutes - a[1].minutes), tot = st.total, c = st.compare, ig = st.intensity, igSum = ig.easy + ig.moderate + ig.hard;
+  const targets = Object.entries(plan.meta.targets || {}), daily = g.daily.slice(-21), gs = st.garmin, W = 320, H = 120, bw = W / Math.max(1, data.length), gains = st.strength.gains.slice(0, 5);
+  const stat = (k, v, d) => html`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d || "\u00a0"}</div></div>`;
   return html`<div class="screen stack gap-lg"><div><div class="eyebrow">${plan.title}</div><h1 style="margin-top:6px">Fortschritt</h1></div>
-    <div class="card"><div class="stats" style="grid-template-columns:repeat(3,1fr)"><div class="stat"><div class="k">Einheiten</div><div class="v">${done.length}</div><div class="d">von ${due} fälligen</div></div>
-      <div class="stat"><div class="k">Trainingszeit</div><div class="v">${Math.round(minutes / 6) / 10} h</div><div class="d">gesamt</div></div>
-      <div class="stat"><div class="k">Serie</div><div class="v">${streak}</div><div class="d">Wochen aktiv</div></div></div></div>
-    <div class="section"><span class="label">Wochenbelastung</span><div class="card stack"><svg class="chart" viewBox=${`0 0 ${W} ${H + 16}`} width="100%" role="img" aria-label="Wochenbelastung: Ziel gegen erledigt">
-      ${data.map((d, i) => { const x = i * bw + bw * 0.18, w = bw * 0.64, th = d.target / maxV * H, dh = d.done / maxV * H;
-        return html`<g><rect x=${x} y=${H - th} width=${w} height=${th} rx="3" fill="none" stroke="var(--line)" stroke-width="1.5" /><rect x=${x} y=${H - dh} width=${w} height=${dh} rx="3" fill=${d.w === cur ? "var(--accent)" : "var(--ink)"} />
-          <text x=${x + w / 2} y=${H + 12} text-anchor="middle">${d.w.slice(8)}.${d.w.slice(5, 7)}</text></g>`; })}</svg>
-      <div class="legend"><span>■ erledigt</span><span>□ Wochenziel</span></div></div></div>
-    ${sportRows.length > 0 && html`<div class="section"><span class="label">Nach Sportart</span><div class="card stack">${sportRows.map(([sp, m]) => html`<div class="stack tight"><div class="row between small"><span class="sport" style="text-transform:none;letter-spacing:0;font-size:.88rem;color:var(--text)"><i style=${`background:${SPORTS[sp].color}`}></i>${SPORTS[sp].label}</span><span class="muted">${m} Min</span></div><div class="meter"><i style=${`width:${m / sportRows[0][1] * 100}%;background:${SPORTS[sp].color}`}></i></div></div>`)}</div></div>`}
-    ${targets.length > 0 && html`<div class="section"><span class="label">Kraft-Ziele</span><div class="list">${targets.map(([nm, x]) => html`<div class="li"><div class="grow"><div class="t">${nm}</div><div class="s">${x.reason || ""}</div></div><span class="tag">${x.seconds != null ? x.seconds + " Sek." : [x.weight != null ? fmtNum(x.weight) + " kg" : "", x.reps != null ? x.reps + " Wdh." : ""].filter(Boolean).join(" × ")}</span></div>`)}</div></div>`}
-    ${daily.length >= 3 && html`<div class="section"><span class="label">Erholung · 3 Wochen</span><div class="card"><div class="grid2"><div><div class="tiny muted">Ruhepuls</div><${Spark} values=${daily.map(d => d.restingHr)} /></div><div><div class="tiny muted">Schlaf</div><${Spark} values=${daily.map(d => d.sleepHours)} color="var(--accent)" /></div></div></div></div>`}
+    <div class="cols"><div class="col stack gap-lg">
+      <div class="card"><div class="stats">${stat("Einheiten", tot.count, `${tot.activeDays} ${tot.activeDays === 1 ? "aktiver Tag" : "aktive Tage"}`)}${stat("Trainingszeit", hours(tot.minutes), tot.longest ? "längste " + tot.longest + " Min" : "")}${stat("Distanz", tot.distance ? f1(tot.distance) + " km" : "–", "aus Logs und Garmin")}${stat("Serie", tot.streakDays, `${tot.streakWeeks} ${tot.streakWeeks === 1 ? "Woche" : "Wochen"} aktiv`)}</div></div>
+      <div class="section"><span class="label">Letzte 4 Wochen</span><div class="list">
+        <div class="li"><div class="grow"><div class="t">${c.cur.count} ${c.cur.count === 1 ? "Einheit" : "Einheiten"}</div><div class="s">${hours(c.cur.minutes)}${c.cur.distance ? " · " + f1(c.cur.distance) + " km" : ""}</div></div>${c.countDelta != null && html`<div class="center"><${Delta} v=${c.countDelta} /><div class="tiny faint">Einheiten</div></div>`}${c.minutesDelta != null && html`<div class="center"><${Delta} v=${c.minutesDelta} /><div class="tiny faint">Zeit</div></div>`}</div>
+        ${st.workload.level !== "unknown" && html`<div class="li"><div class="grow"><div class="t">Wochenbelastung</div><div class="s">Letzte 7 Tage gegen Ø der letzten 4 Wochen</div></div><span class=${"tag " + (st.workload.level === "high" ? "bad" : st.workload.level === "low" ? "warn" : "good")}>${st.workload.level === "high" ? "hoch" : st.workload.level === "low" ? "niedrig" : "ausgewogen"} · ${f1(st.workload.ratio)}</span></div>`}</div>
+        ${c.prev.count === 0 && html`<p class="tiny faint">Veränderungen erscheinen, sobald Vergleichswerte aus dem Vormonat vorliegen.</p>`}</div>
+      <div class="section"><span class="label">Wochenbelastung</span><div class="card stack"><svg class="chart" viewBox=${`0 0 ${W} ${H + 16}`} width="100%" role="img" aria-label="Wochenbelastung: Ziel gegen erledigt">
+        ${data.map((d, i) => { const x = i * bw + bw * 0.18, w = bw * 0.64, th = d.target / maxV * H, dh = d.done / maxV * H;
+          return html`<g><rect x=${x} y=${H - th} width=${w} height=${th} rx="3" fill="none" stroke="var(--line)" stroke-width="1.5" /><rect x=${x} y=${H - dh} width=${w} height=${dh} rx="3" fill=${d.w === cur ? "var(--accent)" : "var(--ink)"} />
+            <text x=${x + w / 2} y=${H + 12} text-anchor="middle">${d.w.slice(8)}.${d.w.slice(5, 7)}</text></g>`; })}</svg>
+        <div class="legend"><span>■ erledigt</span><span>□ Wochenziel</span></div></div></div>
+      <div class="section"><span class="label">Auszeichnungen</span>${awards.length ? html`<div class="awards">${awards.map(a => html`<div class="award"><span class="medal"><${Icon} name="award" size=${18} /></span><div class="bold">${a.title}</div><div class="small muted">${a.desc}</div><div class="tiny faint">${fmtDate(a.date)}</div></div>`)}</div>` : html`<div class="note">Noch keine Auszeichnungen. Die erste bekommst du nach deiner ersten abgeschlossenen Einheit.</div>`}</div>
+    </div><div class="col stack gap-lg">
+      ${sportRows.length > 0 && html`<div class="section"><span class="label">Verteilung</span><div class="card stack">${sportRows.map(([sp, e]) => html`<div class="stack tight"><div class="row between small"><span class="sport" style="text-transform:none;letter-spacing:0;font-size:.88rem;color:var(--text)"><i style=${`background:${SPORTS[sp].color}`}></i>${SPORTS[sp].label}</span><span class="muted">${hours(e.minutes)}${e.distance ? " · " + f1(e.distance) + " km" : ""}</span></div><div class="meter"><i style=${`width:${e.minutes / sportRows[0][1].minutes * 100}%;background:${SPORTS[sp].color}`}></i></div></div>`)}
+        ${igSum > 0 && html`<hr /><div class="stack tight"><div class="row between small"><span class="muted">Intensität</span><span class="muted">${Math.round(ig.easy / igSum * 100)} % locker · ${Math.round(ig.moderate / igSum * 100)} % moderat · ${Math.round(ig.hard / igSum * 100)} % intensiv</span></div>
+          <div class="meter" style="display:flex"><i style=${`width:${ig.easy / igSum * 100}%;background:var(--good);border-radius:0`}></i><i style=${`width:${ig.moderate / igSum * 100}%;background:var(--warn);border-radius:0`}></i><i style=${`width:${ig.hard / igSum * 100}%;background:var(--bad);border-radius:0`}></i></div></div>`}</div></div>`}
+      ${(st.strength.sets > 0 || targets.length > 0) && html`<div class="section"><span class="label">Kraft</span><div class="list">
+        <div class="li"><div class="grow"><div class="t">${st.strength.volume >= 1000 ? f1(st.strength.volume / 1000) + " t" : st.strength.volume + " kg"} bewegt</div><div class="s">${st.strength.sets} Sätze insgesamt</div></div></div>
+        ${gains.map(e => html`<div class="li"><div class="grow"><div class="t">${e.name}</div><div class="s">${f1(e.from)} → ${f1(e.to)} kg in ${e.sessions} Einheiten</div></div><span class="tag good">+${Math.round((e.to - e.from) / e.from * 100)} %</span></div>`)}
+        ${targets.map(([nm, x]) => html`<div class="li"><div class="grow"><div class="t">${nm}</div><div class="s">Nächstes Ziel${x.reason ? ": " + x.reason : ""}</div></div><span class="tag">${x.seconds != null ? x.seconds + " Sek." : [x.weight != null ? fmtNum(x.weight) + " kg" : "", x.reps != null ? x.reps + " Wdh." : ""].filter(Boolean).join(" × ")}</span></div>`)}</div></div>`}
+      ${gs.hasData && html`<div class="section"><span class="label">Alltag und Fitness (Garmin)</span><div class="card stack"><div class="stats" style="grid-template-columns:repeat(2,1fr)">
+        ${stat("Schritte Ø 7 Tage", gs.steps7 != null ? gs.steps7.toLocaleString("de-DE") : "–", gs.bestSteps ? "Bestwert " + gs.bestSteps.toLocaleString("de-DE") : "")}${stat("Schlaf Ø 7 Tage", gs.sleep7 != null ? f1(gs.sleep7) + " h" : "–")}
+        ${stat("Ruhepuls Ø 7 Tage", gs.rhr7 != null ? Math.round(gs.rhr7) + " bpm" : "–", gs.rhrDelta != null ? (gs.rhrDelta > 0 ? "+" : "") + f1(gs.rhrDelta) + " zur Vorwoche" : "")}${stat("VO₂max", gs.vo2 ? f1(gs.vo2.latest) : "–", gs.vo2 && gs.vo2.series.length > 1 ? (gs.vo2.delta > 0 ? "+" : "") + f1(gs.vo2.delta) + " seit Beginn" : "")}</div>
+        ${gs.vo2 && gs.vo2.series.length > 2 && html`<div><div class="tiny muted">VO₂max-Verlauf</div><${Spark} values=${gs.vo2.series.map(x => x.v)} color="var(--accent)" /></div>`}
+        ${daily.length >= 3 && html`<div class="grid2"><div><div class="tiny muted">Ruhepuls</div><${Spark} values=${daily.map(d => d.restingHr)} /></div><div><div class="tiny muted">Schlaf</div><${Spark} values=${daily.map(d => d.sleepHours)} color="var(--accent)" /></div></div>`}</div></div>`}
+    </div></div>
   </div>`;
 }
 
@@ -182,7 +202,7 @@ function GarminCard() {
 export function Profile({onWizard}) {
   const st = S.state, plan = S.activePlan(), cloud = st.adapter && st.adapter.mode === "cloud", archived = st.plans.filter(p => p.status !== "active");
   const [confirm, setConfirm] = useState(null);
-  return html`<div class="screen stack gap-lg"><h1>Profil</h1>
+  return html`<div class="screen narrow stack gap-lg"><h1>Profil</h1>
     <div class="section"><span class="label">Konto</span><div class="list"><${Row} title=${cloud ? st.user.email : "Demo-Modus"} sub=${cloud ? "Daten nur für dein Konto sichtbar" : "Ohne Konto – Daten nur in diesem Browser"} />${cloud && html`<${Row} title="Abmelden" onClick=${S.auth.signOut} />`}</div>
       ${!cloud && html`<p class="small muted">Für Konten, KI-Coach und Garmin die <code>config.js</code> mit deinem Supabase-Projekt füllen (siehe README).</p>`}</div>
     <div class="section"><span class="label">Trainingsplan</span><div class="list">${plan ? html`<${Row} title=${plan.title} sub=${`${fmtDay(plan.startDate)} – ${fmtDay(plan.endDate)}`} right=${html`<span class="tag good">aktiv</span>`} />` : html`<${Row} title="Kein aktiver Plan" />`}

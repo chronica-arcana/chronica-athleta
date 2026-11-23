@@ -116,7 +116,7 @@ export function buildSession(kind, minutes, ctx = {}) {
     case "mobility": {
       const key = pickFlow(ctx), f = FLOWS[key];
       out.title = `Yoga: ${f.title}`; out.flowKey = key; out.flow = buildFlow(key, m);
-      out.blocks = [B("Fokus", f.focus), B("Ablauf", `${out.flow.length} Positionen in ${m} Min. Ruhig atmen, nie bis zum Schmerz dehnen.`)];
+      out.blocks = [B("Fokus", f.focus), B("Hinweis", `${out.flow.length} Positionen in ${m} Min. Ruhig atmen, nie bis zum Schmerz dehnen.`)];
       break;
     }
     case "walk":

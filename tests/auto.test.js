@@ -72,6 +72,10 @@ test("Anpassung nach Bereitschaft: niedrig -> Yoga statt Training, mäßig -> 15
   assert.equal(s.kind, "mobility"); assert.ok(s.flow.length >= 5); assert.equal(s.flowKey, "relax"); assert.ok(s.auto && /Erholung niedrig/.test(s.auto.reason));
   assert.ok(res.notes.some(n => /Yoga\/Mobility ersetzt/.test(n))); assert.equal(after.plan.meta.debt.strength, 0, "Kraft wurde bereits als Snack nachgeholt oder verworfen");
   assert.equal(applyReadiness(after.plan, after.sessions, todayHard.date, low).sessions.length, 0, "idempotent");
+  // Yoga heute -> automatisch geplantes Yoga der nächsten zwei Tage entfällt
+  const withYoga = fresh({sports: ["run", "strength"], primary: "run", level: "beginner", daysPerWeek: 3, minutesPerSession: 35, mode: "health", weeks: 6, startDate: "2026-11-24"});
+  const mon = withYoga.sessions.find(x => x.status === "planned" && x.kind === "strength_full"), nextYoga = withYoga.sessions.find(x => x.kind === "mobility" && x.date > mon.date && x.date <= addDays(mon.date, 2));
+  if (nextYoga) { const r = apply(withYoga, applyReadiness(withYoga.plan, withYoga.sessions, mon.date, low)); assert.equal(r.sessions.find(x => x.id === nextYoga.id).status, "skipped"); assert.equal(r.sessions.find(x => x.id === mon.id).kind, "mobility"); }
   // mäßig: Ausdauereinheit wird gekürzt
   const run = st.sessions.find(x => x.date >= TODAY && x.status === "planned" && x.kind === "run_tempo" || x.kind === "run_long" && x.status === "planned" && x.date >= TODAY);
   const mid = apply(st, applyReadiness(st.plan, st.sessions, run.date, {level: "medium", score: 52, factors: [{delta: -12, text: "wenig Schlaf"}]})).sessions.find(x => x.id === run.id);
@@ -90,11 +94,17 @@ test("Garmin-Aktivitäten werden automatisch übernommen (geplante Einheit erled
   assert.equal(res.count, 2); st = apply(st, res);
   const linked = st.sessions.find(s => s.id === planned.id);
   assert.equal(linked.status, "done"); assert.equal(linked.log.garminActivityId, "g1"); assert.equal(linked.log.durationMin, 41); assert.equal(linked.log.distanceKm, 7.2);
-  const extra = st.sessions.find(s => s.log && s.log.garminActivityId === "g2"); assert.ok(extra); assert.equal(extra.source, "garmin"); assert.equal(extra.sport, "bike"); assert.equal(extra.status, "done");
+  const extra = st.sessions.find(s => s.log && s.log.garminActivityId === "g2"); assert.ok(extra); assert.equal(extra.title, "Radtour", "Titel aus Garmin"); assert.equal(extra.source, "garmin"); assert.equal(extra.sport, "bike"); assert.equal(extra.status, "done");
   assert.ok(res.notes.length === 2 && res.notes.some(n => /als erledigt übernommen/.test(n)) && res.notes.some(n => /passt sich an/.test(n)));
   const again = importGarminActivities(st.plan, st.sessions, acts, TODAY, addDays(TODAY, -10)); assert.equal(again.count, 0, "zweiter Import übernimmt nichts doppelt");
   // lange Radtour erhöht die Wochenbelastung -> restliche Einheiten der Woche werden gekürzt (Rebalancing)
   const ws = weekStart(extra.date), restBefore = fresh().sessions.filter(s => weekStart(s.date) === ws && s.date > extra.date && s.status === "planned").reduce((a, s) => a + s.durationMin, 0);
   const restAfter = st.sessions.filter(s => weekStart(s.date) === ws && s.date > extra.date && s.status === "planned").reduce((a, s) => a + s.durationMin, 0);
   assert.ok(restAfter <= restBefore, `${restBefore} -> ${restAfter}`);
+});
+
+test("Nachträglich eingetragene Aktivität vor dem Planstart erzeugt kein Wochenziel", () => {
+  const st = fresh(), before = addDays(weekStart(st.plan.startDate), -3); // Woche vor dem Plan
+  const res = importGarminActivities(st.plan, st.sessions, [{id: "x", date: before, start: "08:00", type: "cycling", name: "Tour", durationMin: 120}], TODAY, addDays(before, -1));
+  assert.equal(res.count, 1); assert.equal(res.plan.meta.weekTargets[weekStart(before)], undefined, "kein Ziel für eine Woche außerhalb des Plans");
 });

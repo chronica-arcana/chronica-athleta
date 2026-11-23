@@ -23,13 +23,13 @@ function App() {
   const showWizard = wizard || (needsPlan && !wizardSeen);
   const closeWizard = () => { setWizard(false); setWizardSeen(true); setTab("today"); };
   const sess = sheet && st.sessions.find(s => s.id === sheet.id);
-  return html`<div>
+  return html`<div class="shell">
     ${st.adapter.mode === "demo" && html`<div class="note tiny center" style="border-radius:0">Demo-Modus: Daten nur lokal. Für Konten, KI und Garmin Supabase und Vercel einrichten (README).</div>`}
     ${tab === "today" && html`<${Today} onOpen=${open} onAdd=${d => setSheet({type: "add", date: d})} onWizard=${() => setWizard(true)} />`}
     ${tab === "plan" && html`<${Plan} onOpen=${open} onAdd=${d => setSheet({type: "add", date: d})} onAvail=${ws => setSheet({type: "avail", ws})} onWizard=${() => setWizard(true)} />`}
     ${tab === "progress" && html`<${Progress} onWizard=${() => setWizard(true)} />`}
     ${tab === "profile" && html`<${Profile} onWizard=${() => setWizard(true)} />`}
-    <nav class="tabbar" aria-label="Hauptnavigation"><div class="tabbar-inner">${TABS.map(([k, ic, lb]) => html`<button class=${"tab" + (tab === k ? " active" : "")} aria-current=${tab === k ? "page" : null} onClick=${() => setTab(k)}><${Icon} name=${ic} size=${22} />${lb}</button>`)}</div></nav>
+    <nav class="tabbar" aria-label="Hauptnavigation"><div class="tabbar-inner"><div class="brand"><small>Chronica</small>Athleta</div>${TABS.map(([k, ic, lb]) => html`<button class=${"tab" + (tab === k ? " active" : "")} aria-current=${tab === k ? "page" : null} onClick=${() => setTab(k)}><${Icon} name=${ic} size=${22} />${lb}</button>`)}</div></nav>
     ${sheet && sheet.type === "session" && sess && html`<${SessionSheet} id=${sheet.id} onClose=${close} />`}
     ${sheet && sheet.type === "log" && sess && html`<${LogSheet} session=${sess} onClose=${close} />`}
     ${sheet && sheet.type === "swap" && sess && html`<${SwapSheet} session=${sess} onClose=${close} />`}

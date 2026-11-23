@@ -188,7 +188,8 @@ export function addSession(plan, sessions, {date, kind, minutes, done = false, l
     exercises: built.exercises.map(e => ({...e, target: (plan.meta.targets || {})[e.name]})), flow: built.flow, flowKey: built.flowKey, ctx, source, log: done ? (log || {durationMin: built.durationMin}) : null, locked: true, baseMinutes: built.durationMin};
   w.S.set(s.id, s); w.touch(s.id);
   const ws = weekStart(date);
-  if (w.P.meta.weekTargets[ws] == null) w.P.meta.weekTargets[ws] = s.load;
+  // Nur Wochen innerhalb des Plans bekommen ein Wochenziel (sonst erfüllt eine einzelne Aktivität ihr eigenes Ziel trivial)
+  if (w.P.meta.weekTargets[ws] == null && ws >= weekStart(plan.startDate) && date <= plan.endDate) w.P.meta.weekTargets[ws] = s.load;
   w.note(done ? `„${s.title}“ als erledigt eingetragen.` : `„${s.title}“ hinzugefügt.`);
   rebalance(null, null, today, {_w: w});
   return finish(w);
