@@ -108,3 +108,14 @@ test("Nachträglich eingetragene Aktivität vor dem Planstart erzeugt kein Woche
   const res = importGarminActivities(st.plan, st.sessions, [{id: "x", date: before, start: "08:00", type: "cycling", name: "Tour", durationMin: 120}], TODAY, addDays(before, -1));
   assert.equal(res.count, 1); assert.equal(res.plan.meta.weekTargets[weekStart(before)], undefined, "kein Ziel für eine Woche außerhalb des Plans");
 });
+
+import {typicalActivity, sportsByUsage} from "../engine/garmin.js";
+test("Typische Garmin-Aktivität je Sportart (Median) und Sortierung nach Nutzung", () => {
+  const acts = [...[40, 50, 60, 45, 55].map((m, i) => ({id: "r" + i, date: addDays(TODAY, -(i * 3 + 1)), start: "07:00", type: "running", durationMin: m, distanceKm: m / 6, avgHr: 150})),
+    {id: "b1", date: addDays(TODAY, -2), start: "09:00", type: "cycling", durationMin: 120, distanceKm: 40, avgHr: 130}, {id: "old", date: addDays(TODAY, -200), start: "07:00", type: "swimming", durationMin: 30}, {id: "kurz", date: addDays(TODAY, -1), start: "07:00", type: "cycling", durationMin: 4}];
+  const run = typicalActivity(acts, "run", TODAY); assert.equal(run.count, 5); assert.equal(run.minutes, 50); assert.equal(run.avgHr, 150); assert.equal(run.distanceKm, 8.3);
+  assert.equal(typicalActivity(acts, "bike", TODAY).minutes, 120, "zu kurze Aktivitäten (<10 Min) zählen nicht"); assert.equal(typicalActivity(acts, "swim", TODAY), null, "älter als 90 Tage");
+  assert.equal(typicalActivity([], "run", TODAY), null);
+  assert.deepEqual(sportsByUsage(acts, ["swim", "bike", "run", "strength"], TODAY).slice(0, 2), ["run", "bike"], "meistgenutzte zuerst");
+  assert.deepEqual(sportsByUsage([], ["swim", "run"], TODAY), ["swim", "run"], "ohne Daten bleibt die Reihenfolge");
+});

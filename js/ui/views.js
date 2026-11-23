@@ -199,19 +199,30 @@ function GarminCard() {
     ${msg && html`<div class="note">${msg}</div>`}</div>`;
 }
 
+function PlanSheet({plan, onClose, onDelete}) {
+  const [title, setTitle] = useState(plan.title), active = plan.status === "active";
+  const sess = S.state.sessions.filter(x => x.planId === plan.id), done = sess.filter(x => x.status === "done").length;
+  return html`<${Sheet} title="Trainingsplan" onClose=${onClose}><div class="stack">
+    <label class="field">Name<input type="text" maxlength="80" value=${title} onInput=${e => setTitle(e.target.value)} /></label>
+    <p class="small muted">${fmtDay(plan.startDate)} – ${fmtDay(plan.endDate)} · ${sess.length} Einheiten, ${done} erledigt${active ? " · aktiv" : " · archiviert"}</p>
+    <button class="btn primary" disabled=${!title.trim() || title.trim() === plan.title} onClick=${async () => { await S.renamePlan(plan.id, title); S.toast("Plan umbenannt.", "info"); onClose(); }}>Namen speichern</button>
+    ${!active && html`<div class="stack tight"><button class="btn" onClick=${async () => { await S.activatePlan(plan.id); S.toast("Plan aktiviert. Bereits vergangene Einheiten gelten als ausgelassen.", "info"); onClose(); }}>Als aktiven Plan verwenden</button><p class="tiny muted">Es ist immer nur ein Plan aktiv. Der bisherige wird archiviert, seine Daten bleiben erhalten.</p></div>`}
+    <button class="btn danger" onClick=${() => onDelete(plan)}>Plan löschen</button></div><//>`;
+}
+
 export function Profile({onWizard}) {
   const st = S.state, plan = S.activePlan(), cloud = st.adapter && st.adapter.mode === "cloud", archived = st.plans.filter(p => p.status !== "active");
-  const [confirm, setConfirm] = useState(null);
+  const [confirm, setConfirm] = useState(null), [manage, setManage] = useState(null);
   return html`<div class="screen narrow stack gap-lg"><h1>Profil</h1>
     <div class="section"><span class="label">Konto</span><div class="list"><${Row} title=${cloud ? st.user.email : "Demo-Modus"} sub=${cloud ? "Daten nur für dein Konto sichtbar" : "Ohne Konto – Daten nur in diesem Browser"} />${cloud && html`<${Row} title="Abmelden" onClick=${S.auth.signOut} />`}</div>
       ${!cloud && html`<p class="small muted">Für Konten, KI-Coach und Garmin die <code>config.js</code> mit deinem Supabase-Projekt füllen (siehe README).</p>`}</div>
-    <div class="section"><span class="label">Trainingsplan</span><div class="list">${plan ? html`<${Row} title=${plan.title} sub=${`${fmtDay(plan.startDate)} – ${fmtDay(plan.endDate)}`} right=${html`<span class="tag good">aktiv</span>`} />` : html`<${Row} title="Kein aktiver Plan" />`}
-      <${Row} title="Neuen Plan erstellen" sub="Der aktuelle Plan wird archiviert, Daten bleiben erhalten" onClick=${onWizard} />
-      ${archived.map(p => html`<${Row} title=${p.title} sub="archiviert" right=${html`<button class="btn sm danger" onClick=${() => setConfirm({type: "plan", id: p.id})}>Löschen</button>`} />`)}</div></div>
+    <div class="section"><span class="label">Trainingspläne</span><div class="list">${st.plans.slice().sort((x, y) => (y.status === "active") - (x.status === "active") || y.startDate.localeCompare(x.startDate)).map(p => html`<${Row} title=${p.title} sub=${`${fmtDay(p.startDate)} – ${fmtDay(p.endDate)}`} right=${html`<span class=${"tag" + (p.status === "active" ? " good" : "")}>${p.status === "active" ? "aktiv" : "archiviert"}</span>`} onClick=${() => setManage(p)} />`)}
+      ${!st.plans.length && html`<${Row} title="Kein Plan vorhanden" />`}<${Row} title="Neuen Plan erstellen" sub="Der aktive Plan wird archiviert, alle Pläne bleiben gespeichert" onClick=${onWizard} /></div></div>
     <div class="section"><span class="label">Garmin</span><${GarminCard} /></div>
     <div class="section"><span class="label">Coach</span><div class="card stack"><label class="check"><input type="checkbox" checked=${st.settings.autoApply !== false} onChange=${e => S.setSettings({autoApply: e.target.checked})} /><span><div class="bold">Empfehlungen automatisch übernehmen</div><div class="small muted">Ziele und Umfang passen sich nach jedem Training an.</div></span></label>
       <p class="tiny muted">${S.aiAvailable() ? "KI aktiv. Beim Auswerten werden Trainingsdaten an den KI-Anbieter gesendet." : "Ohne Cloud-Konto arbeitet der Coach regelbasiert."}</p></div></div>
     <div class="section"><span class="label">Daten</span><div class="list"><${Row} title="Alle Trainingsdaten löschen" danger=${true} onClick=${() => setConfirm({type: "data"})} />${cloud && html`<${Row} title="Konto endgültig löschen" danger=${true} onClick=${() => setConfirm({type: "account"})} />`}</div></div>
+    ${manage && html`<${PlanSheet} plan=${st.plans.find(x => x.id === manage.id) || manage} onClose=${() => setManage(null)} onDelete=${p => { setManage(null); setConfirm({type: "plan", id: p.id}); }} />`}
     ${confirm && html`<${Sheet} title="Wirklich?" onClose=${() => setConfirm(null)}><div class="stack"><p class="muted">${confirm.type === "account" ? "Dein Konto und alle Daten werden unwiderruflich gelöscht." : confirm.type === "data" ? "Alle Pläne und Einheiten werden gelöscht." : "Dieser Plan und seine Einheiten werden gelöscht."}</p>
       <button class="btn primary" onClick=${async () => { const c = confirm; setConfirm(null); try { if (c.type === "account") await S.deleteAccount(); else if (c.type === "data") await S.resetData(); else await S.deletePlan(c.id); } catch (e) { S.toast(e.message, "error"); } }}>Ja, löschen</button><button class="btn" onClick=${() => setConfirm(null)}>Abbrechen</button></div><//>`}
   </div>`;

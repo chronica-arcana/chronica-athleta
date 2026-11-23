@@ -2,13 +2,14 @@ import {LocalAdapter, SupabaseAdapter} from "./adapters.js";
 import {ai, bindAdapter, aiAvailable, garmin as garminApi} from "./api.js";
 import {generatePlan, normalizeGoal, defaultTitle, EVENT_PRESETS} from "../engine/planner.js";
 import * as A from "../engine/adapt.js";
-import {recoveryFlags, activityFlags, matchActivities, importSuggestions, normalizeExport} from "../engine/garmin.js";
+import {recoveryFlags, activityFlags, matchActivities, importSuggestions, normalizeExport, typicalActivity, sportsByUsage} from "../engine/garmin.js";
 import {readiness} from "../engine/readiness.js";
 import {computeStats} from "../engine/stats.js";
 import {sanitizeChat, buildChatContext} from "../engine/chat.js";
 import {applyReadiness, importGarminActivities} from "../engine/auto.js";
 import {kindInfo, SPORTS, PICKABLE_SPORTS} from "../engine/catalog.js";
 import {todayISO, uuid, addDays, weekStart} from "../engine/dates.js";
+import {pruneDrafts} from "./drafts.js";
 
 export const state = {phase: "loading", adapter: null, user: null, plans: [], sessions: [], garmin: {activities: [], daily: []}, link: null,
   settings: {autoApply: true}, toasts: [], busy: false, error: "", recovering: false, syncing: false, syncError: ""};
@@ -54,7 +55,7 @@ export async function loadData() {
     state.phase = "app";
   } catch (e) { state.error = errText(e); state.phase = "error"; }
   emit();
-  if (state.phase === "app") { await afterGarminData(); autoSync(); }
+  if (state.phase === "app") { pruneDrafts(); await afterGarminData(); autoSync(); }
 }
 
 /* ---------- Anwenden eines Engine-Ergebnisses ---------- */
@@ -175,6 +176,17 @@ export async function createPlan(goal, extras = {}) {
   await housekeeping(); emit();
   return plan;
 }
+export async function renamePlan(id, title) {
+  const t = String(title || "").trim().slice(0, 80), p = state.plans.find(x => x.id === id); if (!t || !p || t === p.title) return;
+  const np = {...p, title: t}; state.plans = state.plans.map(x => x.id === id ? np : x); emit();
+  try { await state.adapter.savePlan(np); } catch (e) { toast("Umbenennen fehlgeschlagen: " + errText(e), "error"); }
+}
+// Einen archivierten Plan aktivieren; der bisher aktive wird archiviert (es ist immer nur einer aktiv)
+export async function activatePlan(id) {
+  const changed = []; state.plans = state.plans.map(p => { if (p.id === id && p.status !== "active") { const n = {...p, status: "active"}; changed.push(n); return n; } if (p.id !== id && p.status === "active") { const n = {...p, status: "archived"}; changed.push(n); return n; } return p; });
+  emit(); try { for (const p of changed) await state.adapter.savePlan(p); } catch (e) { toast("Aktivieren fehlgeschlagen: " + errText(e), "error"); }
+  await housekeeping(); await afterGarminData(); emit();
+}
 export async function deletePlan(id) { await state.adapter.deletePlan(id); state.plans = state.plans.filter(p => p.id !== id); state.sessions = state.sessions.filter(s => s.planId !== id); emit(); }
 export async function setSettings(patch) { state.settings = {...state.settings, ...patch}; emit(); try { await state.adapter.saveSettings(state.settings); } catch (e) { toast(errText(e), "error"); } }
 
@@ -243,5 +255,7 @@ export async function importGarminFile(text) {
   state.garmin = {activities: [...a.values()].sort((x, y) => (x.date + x.start).localeCompare(y.date + y.start)), daily: [...d.values()].sort((x, y) => x.date.localeCompare(y.date))};
   emit(); await afterGarminData(); return {activities: g.activities.length, daily: g.daily.length};
 }
+export const typicalFor = sport => typicalActivity(state.garmin.activities, sport, today());
+export const sportsByUse = sports => sportsByUsage(state.garmin.activities, sports, today());
 export const garminSuggestions = () => importSuggestions(state.garmin.activities, state.sessions, addDays(today(), -10));
 export { garminApi, ai, aiAvailable, A, SPORTS, PICKABLE_SPORTS, kindInfo, EVENT_PRESETS, defaultTitle, normalizeGoal, todayISO, uuid, addDays, weekStart };

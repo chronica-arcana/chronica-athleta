@@ -65,3 +65,18 @@ export function normalizeExport(raw) {
   if (!acts.length && !daily.length) throw new Error("Die Datei enthält keine Aktivitäten oder Tageswerte.");
   return {activities: acts.slice(-1500), daily: daily.slice(-400)};
 }
+
+// Typische Aktivität einer Sportart aus der Garmin-Historie (Median der letzten Aktivitäten, max. 90 Tage alt)
+export function typicalActivity(activities, sport, today, n = 10) {
+  const from = new Date(Date.parse(today) - 90 * 864e5).toISOString().slice(0, 10);
+  const list = (activities || []).filter(a => sportOfActivity(a.type) === sport && a.date >= from && a.date <= today && (a.durationMin || 0) >= 10).sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start)).slice(-n);
+  if (!list.length) return null;
+  const med = arr => { const v = arr.filter(x => x != null && x > 0).sort((x, y) => x - y); if (!v.length) return null; const m = Math.floor(v.length / 2); return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2; };
+  const dur = med(list.map(a => a.durationMin)), dist = med(list.map(a => a.distanceKm)), hr = med(list.map(a => a.avgHr));
+  return {count: list.length, minutes: Math.round(dur / 5) * 5 || Math.round(dur), distanceKm: dist != null ? Math.round(dist * 10) / 10 : null, avgHr: hr != null ? Math.round(hr) : null, last: list[list.length - 1].date};
+}
+// Sportarten nach Nutzung in Garmin sortieren (häufig/zuletzt zuerst); ohne Daten bleibt die Reihenfolge
+export function sportsByUsage(activities, sports, today) {
+  const score = sp => { const t = typicalActivity(activities, sp, today, 30); return t ? t.count * 1000 + (Date.parse(t.last) / 864e5) % 1000 : 0; };
+  return sports.slice().sort((a, b) => score(b) - score(a));
+}
