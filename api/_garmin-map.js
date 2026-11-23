@@ -21,9 +21,11 @@ export function mapActivity(a) {
     anaerobicTE: round(num(first(a, "anaerobicTrainingEffect", "anaerobicTE"))), trainingLoad: round(num(first(a, "activityTrainingLoad", "trainingLoad")), 0)};
 }
 export function mapSleep(res, date) {
-  const o = first(res || {}, "dailySleepDTO") || res || {}, secs = num(first(o, "sleepTimeSeconds", "totalSleepSeconds", "sleepTime"));
-  if (secs == null && first(o, "sleepScores.overall.value", "sleepScore") == null) return null;
-  return {date: day(first(o, "calendarDate")) || date, sleepHours: secs != null ? round(secs / 3600, 2) : null, sleepScore: num(first(o, "sleepScores.overall.value", "sleepScore", "overallScore"))};
+  const o = first(res || {}, "dailySleepDTO") || res || {}, raw = num(first(o, "sleepTimeSeconds", "totalSleepSeconds", "sleepTime"));
+  const secs = raw && raw > 0 ? raw : null; // 0 Sekunden = keine Messung (sonst falscher "wenig Schlaf"-Hinweis)
+  const score = num(first(o, "sleepScores.overall.value", "sleepScore", "overallScore"));
+  if (secs == null && score == null) return null;
+  return {date: day(first(o, "calendarDate")) || date, sleepHours: secs != null ? round(secs / 3600, 2) : null, sleepScore: score};
 }
 export function mapHrv(item) {
   const o = first(item || {}, "hrvSummary") || item || {}, date = day(first(o, "calendarDate") || first(item || {}, "calendarDate"));
@@ -39,14 +41,20 @@ export function mapRestingHr(res, date) {
 export function mapBodyBattery(item) {
   const date = day(first(item || {}, "date", "calendarDate"));
   const arr = first(item || {}, "bodyBatteryValuesArray", "bodyBatteryValues") || [];
-  const vals = arr.map(x => Array.isArray(x) ? num(x[1]) : num(x && x.value)).filter(v => v != null);
+  // Eintragsformat variiert: [Zeitstempel, Wert] oder [Zeitstempel, "MEASURED", Wert, Version]: erster Zahlenwert 0–100 nach dem Zeitstempel
+  const level = x => { if (!Array.isArray(x)) return num(x && (x.value ?? x.level)); for (let i = 1; i < x.length; i++) { const v = typeof x[i] === "number" ? x[i] : null; if (v != null && v >= 0 && v <= 100) return v; } return null; };
+  const vals = arr.map(level).filter(v => v != null);
   if (!date || !vals.length) return null;
   return {date, bodyBatteryMorning: Math.max(...vals.slice(0, Math.max(1, Math.ceil(vals.length / 3))))};
 }
 
 // Form einer Antwort ohne Werte (nur Feldnamen/Typen), für die Diagnose
 export function shapeOf(v, depth = 3) {
-  if (Array.isArray(v)) return v.length ? [shapeOf(v[0], depth - 1)] : [];
+  if (Array.isArray(v)) {
+    if (!v.length) return [];
+    if (Array.isArray(v[0]) && v[0].every(x => x === null || typeof x !== "object")) return [v[0].slice(0, 8).map(x => x === null ? "null" : typeof x)]; // Tupel: Typen aller Elemente
+    return [shapeOf(v[0], depth - 1)];
+  }
   if (v && typeof v === "object") return depth <= 0 ? "{…}" : Object.fromEntries(Object.keys(v).slice(0, 40).map(k => [k, shapeOf(v[k], depth - 1)]));
   return v === null ? "null" : typeof v;
 }

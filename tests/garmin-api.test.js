@@ -176,3 +176,22 @@ test("Garmin-Sync mit verschiedenen Token-Formaten und bei unbekanntem Format mi
     assert.equal(ok.body.tokenResponse.tokenFound, true); assert.ok(ok.body.endpoints.activities); assert.ok(!JSON.stringify(ok.body).includes(TOKEN));
   } finally { s.close(); }
 });
+
+test("Mapper gegen die echte Struktur aus der Garmin-Diagnose (Feldnamen wie von Garmin geliefert)", () => {
+  // Schlaf liegt auf oberster Ebene (kein dailySleepDTO), HRV in hrvSummaries, Ruhepuls in dailyHeartRate
+  const sleep = {id: 1, calendarDate: "2026-11-22", sleepTimeSeconds: 26100, napTimeSeconds: 0, sleepScores: {overall: {value: 81, qualifierKey: "GOOD"}}, avgHeartRate: 49};
+  assert.deepEqual(mapSleep(sleep, "2026-11-22"), {date: "2026-11-22", sleepHours: 7.25, sleepScore: 81});
+  assert.equal(mapSleep({calendarDate: "2026-11-23", sleepTimeSeconds: 0, sleepScores: null}, "2026-11-23"), null, "keine Messung -> kein 0-Stunden-Schlaf");
+  const hrv = {hrvSummaries: [{calendarDate: "2026-11-22", weeklyAvg: 50, lastNightAvg: 47, status: "UNBALANCED", baseline: {}}], userProfilePk: 1};
+  assert.deepEqual(asList(hrv).map(mapHrv), [{date: "2026-11-22", hrvAvg: 47, hrvStatus: "UNBALANCED"}]);
+  assert.equal(mapRestingHr({calendarDate: "2026-11-22", restingHeartRate: 52, heartRateValues: [[1, 60]]}, "x").restingHr, 52);
+  const act = mapActivity({activityId: 123456789, activityName: "Krafttraining", startTimeLocal: "2026-11-22 18:05:11", startTimeGMT: "2026-11-22 17:05:11", activityType: {typeId: 13, typeKey: "strength_training", parentTypeId: 29},
+    distance: 0, duration: 3012.5, calories: 320, averageHR: 112, maxHR: 148, aerobicTrainingEffect: 2.3, anaerobicTrainingEffect: 0.4});
+  assert.deepEqual([act.id, act.date, act.start, act.type, act.durationMin, act.avgHr, act.aerobicTE, act.trainingLoad], ["123456789", "2026-11-22", "18:05", "strength_training", 50.2, 112, 2.3, null]);
+  // Body Battery: beide denkbaren Eintragsformate
+  assert.equal(mapBodyBattery({date: "2026-11-22", bodyBatteryValuesArray: [[1, "MEASURED", 62, 1.0], [2, "MEASURED", 88, 1.0], [3, "MEASURED", 70, 1.0], [4, "MEASURED", 20, 1.0], [5, "MEASURED", 15, 1.0], [6, "MEASURED", 10, 1.0]]}).bodyBatteryMorning, 88);
+  assert.equal(mapBodyBattery({date: "2026-11-22", bodyBatteryValuesArray: [[1, 41], [2, 77], [3, 60], [4, 30], [5, 20], [6, 10]]}).bodyBatteryMorning, 77);
+  assert.equal(mapBodyBattery({date: "2026-11-22", bodyBatteryValuesArray: [[1, "MEASURED", null]]}), null);
+  // Diagnose zeigt Tupel-Listen mit allen Elementtypen
+  assert.deepEqual(shapeOf({v: [[1700000000000, "MEASURED", 55, 1]]}), {v: [["number", "string", "number", "number"]]});
+});
