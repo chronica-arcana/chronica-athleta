@@ -122,13 +122,26 @@ export function Progress({onWizard}) {
 }
 
 function GarminCard() {
-  const [busy, setBusy] = useState(false), [msg, setMsg] = useState("");
-  const g = S.state.garmin, last = g.daily.length ? g.daily[g.daily.length - 1].date : null;
+  const cloud = S.state.adapter && S.state.adapter.mode === "cloud";
+  const [busy, setBusy] = useState(false), [msg, setMsg] = useState(""), [key, setKey] = useState(""), [guide, setGuide] = useState(false);
+  const g = S.state.garmin, link = S.state.link, connected = link && link.status === "connected", last = g.daily.length ? g.daily[g.daily.length - 1].date : null;
+  const run = fn => async () => { setBusy(true); setMsg(""); try { await fn(); } catch (e) { setMsg("⚠ " + e.message); } setBusy(false); };
+  const connect = run(async () => { await S.garminApi.connect(key.trim()); setKey(""); await S.refreshLink(); setMsg("✓ Key geprüft und verschlüsselt gespeichert."); });
+  const sync = run(async () => { const r = await S.garminApi.sync(30); await S.loadData(); setMsg(`✓ ${r.activities} Aktivitäten, ${r.daily} Tageswerte synchronisiert.`); });
+  const disc = run(async () => { await S.garminApi.disconnect(); await S.refreshLink(); S.toast("Garmin getrennt, Key gelöscht.", "info"); });
   const onFile = async e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (!f) return; setBusy(true); setMsg(""); try { const r = await S.importGarminFile(await f.text()); setMsg(`✓ ${r.activities} Aktivitäten, ${r.daily} Tageswerte importiert.`); } catch (err) { setMsg("⚠ " + err.message); } setBusy(false); };
-  return html`<div class="card stack"><div class="row"><span style="font-size:1.6rem">⌚</span><div class="grow"><h3>Garmin</h3><div class="small muted">Aktivitäten, Schlaf, HRV, Ruhepuls & Body Battery bremsen oder erlauben Steigerungen.</div></div></div>
-    ${g.activities.length || g.daily.length ? html`<div class="row wrap"><span class="chip good">${g.activities.length} Aktivitäten</span><span class="chip">${g.daily.length} Tageswerte</span>${last && html`<span class="chip">bis ${last}</span>`}</div>` : html`<p class="small muted">Noch keine Garmin-Daten.</p>`}
+  return html`<div class="card stack"><div class="row"><span style="font-size:1.6rem">⌚</span><div class="grow"><h3>Garmin Connect</h3><div class="small muted">Aktivitäten, Schlaf, HRV, Ruhepuls & Body Battery bremsen oder erlauben Steigerungen.</div></div></div>
+    ${g.activities.length || g.daily.length ? html`<div class="row wrap"><span class="chip good">${g.activities.length} Aktivitäten</span><span class="chip">${g.daily.length} Tageswerte</span>${last && html`<span class="chip">bis ${last}</span>`}</div>` : null}
+    ${!cloud && html`<div class="banner small">Die direkte Verbindung (Personal API) braucht ein Cloud-Konto. Im Demo-Modus nur Datei-Import.</div>`}
+    ${cloud && connected && html`<div class="row wrap"><span class="chip good">Key gespeichert</span>${link.last_sync_at && html`<span class="chip">Sync: ${String(link.last_sync_at).slice(0, 16).replace("T", " ")}</span>`}${link.last_error && html`<span class="chip warn">${String(link.last_error).slice(0, 60)}</span>`}</div>
+      <div class="row"><button class="btn primary grow" disabled=${busy} onClick=${sync}>${busy ? "…" : "Jetzt synchronisieren"}</button><button class="btn danger" disabled=${busy} onClick=${disc}>Trennen</button></div>`}
+    ${cloud && link && link.status === "error" && html`<div class="banner small">Der gespeicherte Key wurde von Garmin abgelehnt. Erzeuge einen neuen Key und füge ihn unten ein.</div>`}
+    ${cloud && !connected && html`<div class="stack"><button class="btn sm" onClick=${() => setGuide(!guide)}>${guide ? "Anleitung ausblenden" : "So bekommst du deinen Personal API Key"}</button>
+      ${guide && html`<ol class="small muted" style="margin:0;padding-left:20px;line-height:1.6"><li>In Garmin Connect (Web) anmelden und die Seite <b>Personal API Key</b> öffnen.</li><li><b>Create Key</b> wählen, Bedingungen lesen und akzeptieren.</li><li>Ablaufdauer wählen und <b>Create</b> klicken.</li><li>Der Key wird <b>nur einmal</b> angezeigt: kopieren und hier einfügen.</li></ol>`}
+      <label class="field">Personal API Key<input type="password" autocomplete="off" spellcheck="false" placeholder="Key hier einfügen" value=${key} onInput=${e => setKey(e.target.value)} /></label>
+      <button class="btn primary" disabled=${busy || key.trim().length < 10} onClick=${connect}>${busy ? "Prüfe …" : "Verbinden"}</button>
+      <p class="tiny muted">Der Key wird nur serverseitig verschlüsselt gespeichert und nie angezeigt oder weitergegeben. Du kannst ihn bei Garmin jederzeit widerrufen.</p></div>`}
     <label class="field">Export-Datei importieren (garmin_data.json)<input type="file" accept="application/json,.json" disabled=${busy} onChange=${onFile} /></label>
-    <p class="tiny muted">Die Datei erzeugt <code>tools/garmin_export.py</code> lokal mit deinem eigenen Account. Die direkte Verbindung über die offizielle <b>Garmin Personal API</b> (eigener API-Key statt Passwort) folgt.</p>
     ${msg && html`<div class="banner info small">${msg}</div>`}</div>`;
 }
 

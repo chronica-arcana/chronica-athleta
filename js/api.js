@@ -21,3 +21,9 @@ export async function ai(task, payload) {
   try { return (await post("/api/ai", {task, payload})).data; }
   catch (e) { if (e.status === 404 || e.status === 503) aiDown = true; throw e; }
 }
+export const garmin = {
+  connect: apiKey => post("/api/garmin", {action: "connect", apiKey}),
+  sync: (days = 30) => post("/api/garmin", {action: "sync", days}),
+  disconnect: () => post("/api/garmin", {action: "disconnect"}),
+  status: () => post("/api/garmin", {action: "status"})
+};

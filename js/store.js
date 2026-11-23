@@ -1,5 +1,5 @@
 import {LocalAdapter, SupabaseAdapter} from "./adapters.js";
-import {ai, bindAdapter, aiAvailable} from "./api.js";
+import {ai, bindAdapter, aiAvailable, garmin as garminApi} from "./api.js";
 import {generatePlan, normalizeGoal, defaultTitle, EVENT_PRESETS} from "../engine/planner.js";
 import * as A from "../engine/adapt.js";
 import {recoveryFlags, activityFlags, matchActivities, importSuggestions, normalizeExport} from "../engine/garmin.js";
@@ -186,6 +186,7 @@ export async function deleteAccount() { await state.adapter.deleteAccount(); sta
 export async function resetData() { await state.adapter.deleteAllData(); state.plans = []; state.sessions = []; emit(); }
 
 /* ---------- Garmin ---------- */
+export async function refreshLink() { try { state.link = await state.adapter.loadLink(); } catch { /* Status bleibt wie er war */ } emit(); }
 export async function importGarminFile(text) {
   const g = normalizeExport(JSON.parse(text));
   await state.adapter.saveGarmin(g);
@@ -195,4 +196,4 @@ export async function importGarminFile(text) {
   emit(); return {activities: g.activities.length, daily: g.daily.length};
 }
 export const garminSuggestions = () => importSuggestions(state.garmin.activities, state.sessions, addDays(today(), -10));
-export { ai, aiAvailable, A, SPORTS, PICKABLE_SPORTS, kindInfo, EVENT_PRESETS, defaultTitle, normalizeGoal, todayISO, uuid, addDays, weekStart };
+export { garminApi, ai, aiAvailable, A, SPORTS, PICKABLE_SPORTS, kindInfo, EVENT_PRESETS, defaultTitle, normalizeGoal, todayISO, uuid, addDays, weekStart };

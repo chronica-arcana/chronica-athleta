@@ -26,6 +26,7 @@ export class LocalAdapter {
   async resetPassword() { throw new Error("Im Demo-Modus nicht verfügbar."); }
   onAuth() { return () => {}; }
   async accessToken() { return null; }
+  async loadLink() { return null; }
   async loadAll() {
     const d = this._read();
     return {plans: d.plans || [], sessions: d.sessions || [], garmin: d.garmin || {activities: [], daily: []}, settings: d.settings || {}, link: null};
@@ -78,6 +79,7 @@ export class SupabaseAdapter {
   async accessToken() { const {data} = await this.sb.auth.getSession(); return data.session ? data.session.access_token : null; }
   _uid() { if (!this.user) throw new Error("Nicht angemeldet"); return this.user.id; }
   async _ok(q) { const {data, error} = await q; if (error) throw new Error(error.message); return data; }
+  async loadLink() { return this._ok(this.sb.from("garmin_links").select("status,last_sync_at,last_error").maybeSingle()); }
   async loadAll() {
     const since = new Date(Date.now() - 180 * 864e5).toISOString().slice(0, 10);
     const [plans, sessions, acts, daily, profile, link] = await Promise.all([
