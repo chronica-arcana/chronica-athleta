@@ -1,5 +1,5 @@
-import {html, useState, useMemo, useEffect} from "../../vendor/preact-htm.js";
-import {IconBox, IntensityChip, statusChip, Spinner, Seg, fmtNum, Sheet} from "./common.js";
+import {html, useState} from "../../vendor/preact-htm.js";
+import {Icon, SportMark, Bar, INTENSITY_TXT, sessionLine, Spinner, Sheet, Row, fmtNum} from "./common.js";
 import * as S from "../store.js";
 import {SPORTS, kindInfo} from "../../engine/catalog.js";
 import {fmtShort, fmtDay, addDays, weekStart, DAY_SHORT, dow, diffDays, DAY_LONG} from "../../engine/dates.js";
@@ -14,182 +14,176 @@ const weekLoads = (plan, sessions, ws) => {
   return {done, planned, target: plan.meta.weekTargets[ws] ?? done + planned, all};
 };
 const DEFAULT_KIND = {run: "run_easy", bike: "bike_easy", swim: "swim_endurance", strength: "strength_full", football: "football_skills", cardio: "cardio_easy", mobility: "mobility", walk: "walk"};
+const describe = s => s.exercises && s.exercises.length ? `${s.exercises.length} Übungen: ${s.exercises.slice(0, 3).map(e => e.name.replace(/ \(.*\)/, "")).join(", ")}${s.exercises.length > 3 ? " …" : ""}` : ((s.blocks.find(b => /Haupt|Plan|Flow|Einheit/.test(b.label)) || s.blocks[0] || {}).text || "");
 
 function SessionRow({s, onOpen, showDate}) {
-  return html`<button class=${"srow " + s.status} onClick=${() => onOpen(s.id)} style="width:100%;text-align:left"><${IconBox} kind=${s.kind} />
-    <div class="grow"><div class="t">${s.title}</div><div class="small muted">${showDate ? fmtShort(s.date) + " · " : ""}${s.durationMin} Min${s.addon ? ` + ${s.addon.minutes} Kraft` : ""}</div></div>
-    ${s.status === "done" ? html`<span class="chip good">✓</span>` : s.status === "skipped" ? html`<span class="chip">–</span>` : html`<${IntensityChip} v=${s.intensity} />`}</button>`;
+  return html`<button class=${"li " + s.status} onClick=${() => onOpen(s.id)}><${Bar} s=${s} />
+    <div class="grow"><div class="t">${s.title}</div><div class="s">${showDate ? fmtShort(s.date) + " · " : ""}${sessionLine(s)}${s.status === "planned" ? " · " + INTENSITY_TXT[s.intensity] : ""}</div></div>
+    ${s.status === "done" ? html`<span class="c-good"><${Icon} name="check" size=${18} /></span>` : s.status === "skipped" ? html`<span class="tiny faint">ausgelassen</span>` : null}
+    <span class="chev"><${Icon} name="chevR" size=${18} /></span></button>`;
 }
-function LoadBar({done, planned, target}) {
-  const max = Math.max(target * 1.2, done + planned, 1);
-  return html`<div class="stack" style="gap:6px"><div class="bar"><i style=${`width:${Math.min(100, done / max * 100)}%`}></i><span class="tick" style=${`left:${Math.min(100, target / max * 100)}%`}></span></div>
-    <div class="row between tiny muted"><span>Erledigt ${Math.round(done)}</span><span>Wochenziel ${Math.round(target)}</span></div></div>`;
-}
+const Meter = ({done, planned, target, label = "Wochenbelastung"}) => {
+  const pct = target > 0 ? Math.min(100, Math.round(done / target * 100)) : 0;
+  return html`<div class="stack tight"><div class="row between small"><span class="muted">${label}</span><span class="bold">${Math.round(done / Math.max(target, 1) * 100)} %</span></div><div class="meter"><i style=${`width:${pct}%`}></i></div></div>`;
+};
 
 export function Empty({onWizard}) {
-  return html`<div class="screen stack"><div class="card hero stack"><div style="font-size:2.4rem">🚀</div><h1>Los geht's!</h1><p class="muted">Erstelle deinen ersten Trainingsplan – für dein Ziel, deine Sportarten und deinen Alltag.</p><button class="btn primary" onClick=${onWizard}>Plan erstellen</button></div></div>`;
+  return html`<div class="screen stack"><div><div class="eyebrow">Chronica Athleta</div><h1 style="margin-top:6px">Noch kein Plan</h1></div>
+    <div class="card stack"><p class="muted">Erstelle einen Trainingsplan für dein Ziel, deine Sportarten und deinen Alltag. Er bleibt flexibel: Einheiten lassen sich tauschen, verschieben und auslassen.</p><button class="btn primary" onClick=${onWizard}>Plan erstellen</button></div></div>`;
 }
 
 const HRV_TXT = {BALANCED: ["ausgeglichen", "good"], UNBALANCED: ["unausgeglichen", "warn"], LOW: ["niedrig", "bad"], POOR: ["schwach", "bad"]};
-function RecoveryCard({connected}) {
+function Recovery({connected}) {
   const daily = S.state.garmin.daily, t = S.today();
-  if (!daily.length) return connected ? html`<div class="card flat row"><span style="font-size:1.4rem">⌚</span><div class="grow small muted">Noch keine Garmin-Tageswerte. Im Profil auf „Jetzt synchronisieren“ tippen.</div></div>` : null;
-  const days = daily.filter(d => d.date <= t), d = days.find(x => x.date === t && (x.sleepHours != null || x.restingHr != null || x.hrvAvg != null)) || days.slice().reverse().find(x => x.sleepHours != null || x.restingHr != null || x.hrvAvg != null || x.bodyBatteryMorning != null);
+  if (!daily.length) return connected ? html`<div class="note">Noch keine Garmin-Tageswerte. Im Profil synchronisieren.</div>` : null;
+  const has = x => x.sleepHours != null || x.restingHr != null || x.hrvAvg != null || x.bodyBatteryMorning != null;
+  const days = daily.filter(d => d.date <= t), d = days.find(x => x.date === t && has(x)) || days.slice().reverse().find(has);
   if (!d) return null;
   const rec = recoveryFlags(daily, d.date), prior = days.filter(x => x.date < d.date && x.restingHr != null).slice(-14).map(x => x.restingHr);
   const base = prior.length >= 5 ? prior.slice().sort((a, b) => a - b)[Math.floor(prior.length / 2)] : null;
   const f1 = n => String(Math.round(n * 10) / 10).replace(".", ","), hrv = d.hrvStatus && HRV_TXT[d.hrvStatus];
-  const sleepCls = d.sleepHours == null ? "" : d.sleepHours < 6 ? "bad" : d.sleepHours < 7 ? "warn" : "good";
-  const rhrDelta = base != null && d.restingHr != null ? d.restingHr - base : null, rhrCls = rhrDelta == null ? "" : rhrDelta >= 5 ? "bad" : rhrDelta >= 3 ? "warn" : "good";
-  const bbCls = d.bodyBatteryMorning == null ? "" : d.bodyBatteryMorning < 30 ? "bad" : d.bodyBatteryMorning < 60 ? "warn" : "good";
-  const tile = (icon, label, value, sub, cls) => html`<div class="rtile"><div class="tiny muted">${icon} ${label}</div><div class="rval">${value}</div><div class=${"tiny " + (cls ? "c-" + cls : "muted")}>${sub || " "}</div></div>`;
-  return html`<div class="card stack"><div class="row between"><h3>⌚ Erholung</h3><span class="tiny muted">${d.date === t ? "heute" : "Stand " + fmtDay(d.date)}</span></div>
-    <div class="grid2">
-      ${tile("😴", "Schlaf", d.sleepHours != null ? f1(d.sleepHours) + " h" : "–", d.sleepScore != null ? "Score " + Math.round(d.sleepScore) : (d.sleepHours != null && d.sleepHours < 6 ? "wenig" : ""), sleepCls)}
-      ${tile("❤️", "Ruhepuls", d.restingHr != null ? Math.round(d.restingHr) + " bpm" : "–", rhrDelta != null ? (rhrDelta > 0 ? "+" : "") + Math.round(rhrDelta) + " zu Ø " + Math.round(base) : "", rhrCls)}
-      ${tile("📈", "HRV", d.hrvAvg != null ? Math.round(d.hrvAvg) + " ms" : "–", hrv ? hrv[0] : "", hrv ? hrv[1] : "")}
-      ${tile("🔋", "Body Battery", d.bodyBatteryMorning != null ? Math.round(d.bodyBatteryMorning) : "–", d.bodyBatteryMorning != null ? (d.bodyBatteryMorning < 30 ? "niedrig" : d.bodyBatteryMorning < 60 ? "mittel" : "gut") : "", bbCls)}
-    </div>
-    ${rec.flags.length ? html`<div class="banner small">${rec.flags.join(" · ")}. Gehe es eher locker an – der Coach bremst Steigerungen automatisch.</div>` : html`<p class="small muted">Keine Auffälligkeiten – Steigerungen sind erlaubt, wenn Schmerz und Anstrengung passen.</p>`}</div>`;
+  const delta = base != null && d.restingHr != null ? d.restingHr - base : null;
+  const cls = {sleep: d.sleepHours == null ? "" : d.sleepHours < 6 ? "bad" : d.sleepHours < 7 ? "warn" : "", rhr: delta == null ? "" : delta >= 5 ? "bad" : delta >= 3 ? "warn" : "",
+    bb: d.bodyBatteryMorning == null ? "" : d.bodyBatteryMorning < 30 ? "bad" : d.bodyBatteryMorning < 60 ? "warn" : ""};
+  const stat = (k, v, sub, c) => html`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class=${"d " + (c ? "c-" + c : "")}>${sub || " "}</div></div>`;
+  return html`<div class="section"><div class="row between"><span class="label">Erholung</span><span class="tiny muted">${d.date === t ? "heute" : "Stand " + fmtDay(d.date)}</span></div>
+    <div class="card stack" style="gap:14px"><div class="stats">
+      ${stat("Schlaf", d.sleepHours != null ? f1(d.sleepHours) + " h" : "–", d.sleepScore != null ? "Score " + Math.round(d.sleepScore) : "", cls.sleep)}
+      ${stat("Ruhepuls", d.restingHr != null ? Math.round(d.restingHr) : "–", delta != null ? (delta > 0 ? "+" : "") + Math.round(delta) + " zu Ø" : "bpm", cls.rhr)}
+      ${stat("HRV", d.hrvAvg != null ? Math.round(d.hrvAvg) : "–", hrv ? hrv[0] : "ms", hrv && hrv[1] !== "good" ? hrv[1] : "")}
+      ${stat("Battery", d.bodyBatteryMorning != null ? Math.round(d.bodyBatteryMorning) : "–", d.bodyBatteryMorning != null && d.bodyBatteryMorning < 60 ? (d.bodyBatteryMorning < 30 ? "niedrig" : "mittel") : "", cls.bb)}</div>
+      ${rec.flags.length ? html`<p class="small c-warn">Auffällig: ${rec.flags.join(", ")}. Der Coach bremst Steigerungen.</p>` : null}</div></div>`;
 }
 
 export function Today({onOpen, onAdd, onWizard}) {
   const plan = S.activePlan(); if (!plan) return html`<${Empty} onWizard=${onWizard} />`;
   const t = S.today(), sessions = S.planSessions(), ws = weekStart(t), idx = weekOf(plan, t), ph = phaseAt(plan, Math.max(0, idx));
-  const todays = sessions.filter(s => s.date === t), openToday = todays.filter(s => s.status === "planned"), doneToday = todays.filter(s => s.status === "done");
-  const lw = weekLoads(plan, sessions, ws), upcoming = sessions.filter(s => s.date > t && s.status === "planned").slice(0, 3);
-  const rec = recoveryFlags(S.state.garmin.daily, t), hasG = S.state.garmin.daily.length > 0;
-  const sugg = S.garminSuggestions().slice(0, 2);
-  const [selDay, setSelDay] = useState(t);
-  const days = Array.from({length: 7}, (_, i) => addDays(ws, i));
-  const hero = openToday[0];
-  const importAct = async a => { const sport = sportOfActivity(a.type);
-    await S.addSession({date: a.date, kind: DEFAULT_KIND[sport] || "cardio_easy", minutes: Math.round(a.durationMin), done: true, source: "garmin", log: {durationMin: Math.round(a.durationMin), avgHr: a.avgHr, distanceKm: a.distanceKm, garminActivityId: a.id}}); };
-  const hello = new Date().getHours() < 12 ? "Guten Morgen" : new Date().getHours() < 18 ? "Hallo" : "Guten Abend";
-  return html`<div class="screen stack">
-    <div><p class="muted small">${DAY_LONG[dow(t)]}, ${fmtDay(t)}</p><h1>${hello} 👋</h1></div>
-    <div class="row wrap"><span class="chip">📋 ${plan.title}</span><span class="chip">Woche ${Math.max(1, idx + 1)} · ${ph.name}</span>
-      ${hasG && html`<span class=${"chip " + (rec.flags.length >= 2 ? "bad" : rec.flags.length ? "warn" : "good")}>⌚ ${rec.data ? (rec.flags.length ? rec.flags.length + " Erholungs-Hinweis(e)" : "Erholung gut") : "Garmin verbunden"}</span>`}</div>
-    ${hero ? html`<div class="card hero stack"><div class="row"><div class="icon-box" style="background:rgba(255,255,255,.22)">${kindInfo(hero.kind).icon}</div><div class="grow"><div class="small muted">Heute geplant</div><h2>${hero.title}</h2></div></div>
-        <div class="row wrap"><span class="chip">${hero.durationMin} Min${hero.addon ? " + " + hero.addon.minutes + " Kraft" : ""}</span><span class="chip">${(hero.intensity === "easy" ? "locker" : hero.intensity === "moderate" ? "moderat" : "hart")}</span>${hero.exercises && hero.exercises.length ? html`<span class="chip">${hero.exercises.length} Übungen</span>` : null}</div>
-        <p style="color:rgba(255,255,255,.92)" class="small">${(hero.blocks.find(b => /Haupt|Plan|Flow|Einheit/.test(b.label)) || hero.blocks[0] || {}).text || ""}</p>
-        <div class="row wrap"><button class="btn primary grow" onClick=${() => onOpen(hero.id, "log")}>✓ Erledigt – loggen</button><button class="btn" onClick=${() => onOpen(hero.id)}>Details</button></div>
-        <div class="grid2"><button class="btn sm" onClick=${() => onOpen(hero.id, "swap")}>🔄 Etwas anderes</button><button class="btn sm" onClick=${() => onOpen(hero.id, "move")}>📅 Verschieben</button></div></div>`
-      : doneToday.length ? html`<div class="card stack"><div class="chip good">✓ Heute erledigt</div>${doneToday.map(s => html`<${SessionRow} s=${s} onOpen=${onOpen} />`)}<p class="small muted">Stark! Der Coach hat die Woche neu ausgerichtet.</p></div>`
-      : html`<div class="card stack"><div class="row"><span style="font-size:2rem">😴</span><div class="grow"><h2>Ruhetag</h2><p class="muted small">Heute ist nichts geplant. Erholung gehört zum Training.</p></div></div><button class="btn" onClick=${() => onAdd(t)}>Trotzdem trainieren</button></div>`}
-    <${RecoveryCard} connected=${!!(S.state.link && S.state.link.status === "connected")} />
-    ${sugg.map(a => html`<div class="card flat row"><span style="font-size:1.4rem">⌚</span><div class="grow"><div class="bold small">Neu von Garmin: ${a.name || a.type}</div><div class="tiny muted">${fmtShort(a.date)} · ${Math.round(a.durationMin)} Min${a.avgHr ? " · Ø " + a.avgHr + " bpm" : ""}</div></div><button class="btn sm primary" onClick=${() => importAct(a)}>Übernehmen</button></div>`)}
-    <div class="card stack"><div class="row between"><h3>Diese Woche</h3><span class="tiny muted">${ph.name}</span></div>
-      <div class="weekstrip">${days.map(d => { const ss = sessions.filter(s => s.date === d); const done = ss.length && ss.every(s => s.status !== "planned" && s.status === "done");
-        return html`<button class=${"day" + (d === t ? " today" : "") + (d === selDay ? " sel" : "") + (done ? " done" : "")} onClick=${() => setSelDay(d)}><span>${DAY_SHORT[dow(d)]}</span><span class="n">${+d.slice(8)}</span><span class="mk">${ss.length ? (done ? "✓" : ss.some(s => s.status === "skipped") && !ss.some(s => s.status === "planned") ? "–" : ss.map(s => kindInfo(s.kind).icon).slice(0, 1).join("")) : "·"}</span></button>`; })}</div>
-      <div class="stack" style="gap:8px">${sessions.filter(s => s.date === selDay).map(s => html`<${SessionRow} s=${s} onOpen=${onOpen} />`)}${!sessions.some(s => s.date === selDay) && html`<p class="small muted center">Frei – ${fmtShort(selDay)}</p>`}</div>
-      <${LoadBar} ...${lw} /></div>
-    ${upcoming.length > 0 && html`<div class="stack" style="gap:8px"><h3>Als Nächstes</h3>${upcoming.map(s => html`<${SessionRow} s=${s} onOpen=${onOpen} showDate=${true} />`)}</div>`}
-    <button class="fab" aria-label="Training hinzufügen" onClick=${() => onAdd(t)}>＋</button></div>`;
+  const todays = sessions.filter(s => s.date === t), open = todays.filter(s => s.status === "planned"), done = todays.filter(s => s.status === "done");
+  const lw = weekLoads(plan, sessions, ws), sugg = S.garminSuggestions().slice(0, 1);
+  const [selDay, setSelDay] = useState(t), days = Array.from({length: 7}, (_, i) => addDays(ws, i)), hero = open[0];
+  const importAct = async a => { const sport = sportOfActivity(a.type); await S.addSession({date: a.date, kind: DEFAULT_KIND[sport] || "cardio_easy", minutes: Math.round(a.durationMin), done: true, source: "garmin", log: {durationMin: Math.round(a.durationMin), avgHr: a.avgHr, distanceKm: a.distanceKm, garminActivityId: a.id}}); };
+  return html`<div class="screen stack gap-lg">
+    <div><div class="page-head"><div><div class="eyebrow">${DAY_LONG[dow(t)]}, ${fmtDay(t)}</div><h1 style="margin-top:6px">Heute</h1></div>
+      <button class="icon-btn" aria-label="Training hinzufügen" onClick=${() => onAdd(t)}><${Icon} name="plus" /></button></div>
+      <p class="sub">${plan.title} · Woche ${Math.max(1, idx + 1)} · ${ph.name}</p></div>
+
+    <div class="section">${hero ? html`<span class="label">Geplant</span>
+        <div class="card hero-card"><div class="stack tight"><${SportMark} s=${hero} /><h2>${hero.title}</h2><div class="meta">${sessionLine(hero)} · ${INTENSITY_TXT[hero.intensity]}</div></div>
+          <p class="small muted clamp2">${describe(hero)}</p>
+          <div class="row"><button class="btn primary grow" onClick=${() => onOpen(hero.id, "log")}>Training loggen</button><button class="btn" onClick=${() => onOpen(hero.id)}>Optionen</button></div></div>
+        ${open.length > 1 && html`<div class="list">${open.slice(1).map(s => html`<${SessionRow} s=${s} onOpen=${onOpen} />`)}</div>`}`
+      : done.length ? html`<span class="label">Erledigt</span><div class="list">${done.map(s => html`<${SessionRow} s=${s} onOpen=${onOpen} />`)}</div>`
+      : html`<span class="label">Heute</span><div class="card stack"><div><h2>Ruhetag</h2><p class="muted small" style="margin-top:4px">Nichts geplant. Erholung gehört zum Training.</p></div><button class="btn" onClick=${() => onAdd(t)}>Trotzdem trainieren</button></div>`}
+      ${sugg.map(a => html`<div class="card row"><div class="grow"><div class="bold small">Neu von Garmin: ${a.name || a.type}</div><div class="tiny muted">${fmtShort(a.date)} · ${Math.round(a.durationMin)} Min${a.avgHr ? " · Ø " + a.avgHr + " bpm" : ""}</div></div><button class="btn sm" onClick=${() => importAct(a)}>Übernehmen</button></div>`)}</div>
+
+    <${Recovery} connected=${!!(S.state.link && S.state.link.status === "connected")} />
+
+    <div class="section"><span class="label">Diese Woche</span>
+      <div class="card stack" style="gap:14px"><div class="weekstrip">${days.map(d => { const ss = sessions.filter(s => s.date === d);
+        return html`<button class=${"wd" + (d === t ? " today" : "") + (d === selDay ? " sel" : "")} onClick=${() => setSelDay(d)}><span>${DAY_SHORT[dow(d)]}</span><span class="n">${+d.slice(8)}</span><span class="mk">${ss.slice(0, 3).map(s => html`<i class=${s.status === "done" ? "done" : ""}></i>`)}</span></button>`; })}</div>
+        <${Meter} ...${lw} /></div>
+      ${selDay !== t && html`<div class="list">${sessions.filter(s => s.date === selDay).map(s => html`<${SessionRow} s=${s} onOpen=${onOpen} />`)}${!sessions.some(s => s.date === selDay) && html`<div class="li"><span class="muted small">Frei · ${fmtShort(selDay)}</span></div>`}</div>`}</div>
+  </div>`;
 }
 
 export function Plan({onOpen, onAdd, onAvail, onWizard}) {
   const plan = S.activePlan(); if (!plan) return html`<${Empty} onWizard=${onWizard} />`;
   const [off, setOff] = useState(0);
-  const sessions = S.planSessions(), t = S.today(), ws = addDays(weekStart(t), off * 7), idx = weekOf(plan, ws), ph = phaseAt(plan, Math.max(0, Math.min(idx, plan.meta.phases[plan.meta.phases.length - 1].toWeek)));
-  const lw = weekLoads(plan, sessions, ws), days = Array.from({length: 7}, (_, i) => addDays(ws, i));
-  const inPlan = idx >= 0 && ws <= plan.endDate;
-  return html`<div class="screen stack">
-    <div><p class="muted small">${plan.title}</p><h1>Plan</h1></div>
-    <div class="card stack"><div class="row between"><button class="btn sm" onClick=${() => setOff(off - 1)} aria-label="Vorherige Woche">‹</button><div class="center"><div class="bold">${off === 0 ? "Diese Woche" : `Woche ${idx + 1}`}</div><div class="tiny muted">${fmtDay(ws)} – ${fmtDay(addDays(ws, 6))}</div></div><button class="btn sm" onClick=${() => setOff(off + 1)} aria-label="Nächste Woche">›</button></div>
-      ${inPlan && html`<div class="row wrap"><span class="chip">${ph.name}</span>${sessions.some(s => weekStart(s.date) === ws && s.ctx && s.ctx.deload) && html`<span class="chip good">Entlastungswoche</span>`}</div><p class="small muted">${ph.focus}</p><${LoadBar} ...${lw} />`}</div>
-    <div class="row"><button class="btn grow" onClick=${() => onAvail(ws)}>🗓️ Woche anpassen</button><button class="btn grow" onClick=${() => onAdd(days.find(d => d >= t) || days[0])}>＋ Training</button></div>
-    <div class="stack" style="gap:8px">${days.map(d => { const ss = sessions.filter(s => s.date === d); return html`<div class="stack" style="gap:6px"><div class="row between"><span class=${"bold small" + (d === t ? "" : " muted")} style=${d === t ? "color:var(--accent)" : ""}>${fmtShort(d)}${d === t ? " · heute" : ""}</span></div>
-      ${ss.length ? ss.map(s => html`<${SessionRow} s=${s} onOpen=${onOpen} />`) : html`<div class="srow" style="opacity:.55"><div class="icon-box" style="background:var(--surface2)">😴</div><div class="small muted">Ruhetag</div></div>`}</div>`; })}</div>
-    <div class="stack"><h3>Gesamtplan</h3>${plan.meta.coachSummary && html`<div class="card flat"><span class="chip" style="margin-bottom:8px">🤖 Coach</span><p class="small">${plan.meta.coachSummary}</p></div>`}
-      ${plan.meta.warnings.map(w => html`<div class="banner small">${w}</div>`)}
-      ${plan.meta.phases.map(p => html`<div class="card flat row"><div class="grow"><div class="bold">${p.name}</div><div class="small muted">${p.focus}</div>${p.criteria && html`<ul class="tiny muted" style="margin:6px 0 0;padding-left:16px">${p.criteria.map(c => html`<li>${c}</li>`)}</ul>`}</div><span class="chip">Wo. ${p.fromWeek + 1}–${p.toWeek + 1}</span></div>`)}</div>
-    <button class="fab" aria-label="Training hinzufügen" onClick=${() => onAdd(S.today())}>＋</button></div>`;
+  const sessions = S.planSessions(), t = S.today(), ws = addDays(weekStart(t), off * 7), idx = weekOf(plan, ws);
+  const ph = phaseAt(plan, Math.max(0, Math.min(idx, plan.meta.phases[plan.meta.phases.length - 1].toWeek)));
+  const lw = weekLoads(plan, sessions, ws), days = Array.from({length: 7}, (_, i) => addDays(ws, i)), inPlan = idx >= 0 && ws <= plan.endDate;
+  const deload = sessions.some(s => weekStart(s.date) === ws && s.ctx && s.ctx.deload);
+  return html`<div class="screen stack gap-lg">
+    <div class="page-head"><div><div class="eyebrow">${plan.title}</div><h1 style="margin-top:6px">Plan</h1></div><button class="icon-btn" aria-label="Training hinzufügen" onClick=${() => onAdd(days.find(d => d >= t) || days[0])}><${Icon} name="plus" /></button></div>
+    <div class="card stack"><div class="row between"><button class="icon-btn" onClick=${() => setOff(off - 1)} aria-label="Vorherige Woche"><${Icon} name="chevL" size=${18} /></button>
+        <div class="center"><div class="bold">${fmtDay(ws)} – ${fmtDay(addDays(ws, 6))}</div><div class="tiny muted">${inPlan ? `Woche ${idx + 1} · ${ph.name}${deload ? " · Entlastung" : ""}` : "außerhalb des Plans"}</div></div>
+        <button class="icon-btn" onClick=${() => setOff(off + 1)} aria-label="Nächste Woche"><${Icon} name="chevR" size=${18} /></button></div>
+      ${inPlan && html`<${Meter} ...${lw} />`}</div>
+    <div class="stack">${days.map(d => { const ss = sessions.filter(s => s.date === d);
+      return ss.length ? html`<div class="section"><span class=${"label"} style=${d === t ? "color:var(--text)" : ""}>${fmtShort(d)}${d === t ? " · heute" : ""}</span><div class="list">${ss.map(s => html`<${SessionRow} s=${s} onOpen=${onOpen} />`)}</div></div>`
+        : html`<div class="row between"><span class="label" style=${d === t ? "color:var(--text)" : ""}>${fmtShort(d)}${d === t ? " · heute" : ""}</span><span class="tiny faint">Frei</span></div>`; })}</div>
+    <div class="stack tight"><button class="btn block" onClick=${() => onAvail(ws)}>Woche anpassen</button><p class="tiny muted center">Nur bestimmte Tage frei? Die Einheiten verteilen sich neu.</p></div>
+    <details class="fold"><summary>Planübersicht<${Icon} name="chevD" size=${18} /></summary><div class="stack">
+      ${plan.meta.coachSummary && html`<div class="stack tight"><span class="label">Coach</span><p class="small">${plan.meta.coachSummary}</p></div>`}
+      ${plan.meta.warnings.map(w => html`<div class="note warn">${w}</div>`)}
+      ${plan.meta.phases.map(p => html`<div class="stack tight"><div class="row between"><span class="bold">${p.name}</span><span class="tiny muted">Wo. ${p.fromWeek + 1}–${p.toWeek + 1}</span></div><p class="small muted">${p.focus}</p>${p.criteria && html`<ul class="tiny muted" style="margin:0;padding-left:16px">${p.criteria.map(c => html`<li>${c}</li>`)}</ul>`}</div>`)}</div></details>
+  </div>`;
 }
 
-function Spark({values, color = "var(--accent)", h = 36}) {
+function Spark({values, color = "var(--ink)", h = 34}) {
   const v = values.filter(x => x != null); if (v.length < 2) return null;
   const min = Math.min(...v), max = Math.max(...v), w = 120, pts = values.map((x, i) => x == null ? null : [i / (values.length - 1) * w, h - 4 - (max === min ? .5 : (x - min) / (max - min)) * (h - 8)]).filter(Boolean);
-  return html`<svg viewBox=${`0 0 ${w} ${h}`} width="100%" height=${h} preserveAspectRatio="none" aria-hidden="true"><polyline fill="none" stroke=${color} stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points=${pts.map(p => p.join(",")).join(" ")} /></svg>`;
+  return html`<svg viewBox=${`0 0 ${w} ${h}`} width="100%" height=${h} preserveAspectRatio="none" aria-hidden="true"><polyline fill="none" stroke=${color} stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points=${pts.map(p => p.join(",")).join(" ")} /></svg>`;
 }
 
 export function Progress({onWizard}) {
   const plan = S.activePlan(); if (!plan) return html`<${Empty} onWizard=${onWizard} />`;
   const sessions = S.planSessions(), t = S.today(), done = sessions.filter(s => s.status === "done");
   const minutes = done.reduce((a, s) => a + (Number(s.log && s.log.durationMin) || s.durationMin), 0);
-  const first = weekStart(plan.startDate), cur = weekStart(t);
-  const n = Math.min(14, Math.max(4, diffDays(cur, first) / 7 + 4));
-  const weeks = Array.from({length: Math.round(n)}, (_, i) => addDays(addDays(cur, 3 * 7), -(Math.round(n) - 1 - i) * 7)).filter(w => w >= first && w <= weekStart(plan.endDate));
-  const data = weeks.map(w => ({w, ...weekLoads(plan, sessions, w)}));
-  const maxV = Math.max(1, ...data.map(d => Math.max(d.target, d.done)));
+  const first = weekStart(plan.startDate), cur = weekStart(t), n = Math.round(Math.min(12, Math.max(4, diffDays(cur, first) / 7 + 4)));
+  const weeks = Array.from({length: n}, (_, i) => addDays(addDays(cur, 3 * 7), -(n - 1 - i) * 7)).filter(w => w >= first && w <= weekStart(plan.endDate));
+  const data = weeks.map(w => ({w, ...weekLoads(plan, sessions, w)})), maxV = Math.max(1, ...data.map(d => Math.max(d.target, d.done)));
   const bySport = {}; done.forEach(s => { bySport[s.sport] = (bySport[s.sport] || 0) + (Number(s.log && s.log.durationMin) || s.durationMin); });
   const sportRows = Object.entries(bySport).sort((a, b) => b[1] - a[1]);
   const streak = (() => { let c = 0, w = cur; if (!done.some(s => weekStart(s.date) === w)) w = addDays(w, -7); while (done.some(s => weekStart(s.date) === w)) { c++; w = addDays(w, -7); } return c; })();
-  const targets = Object.entries(plan.meta.targets || {});
-  const daily = S.state.garmin.daily.slice(-21);
-  const compl = sessions.filter(s => s.date < t || s.status === "done").length;
-  const W = 320, H = 130, bw = W / Math.max(1, data.length);
-  return html`<div class="screen stack"><div><p class="muted small">${plan.title}</p><h1>Fortschritt</h1></div>
-    <div class="grid2"><div class="card"><div class="tiny muted">Erledigt</div><h1>${done.length}</h1><div class="tiny muted">von ${compl} fälligen</div></div>
-      <div class="card"><div class="tiny muted">Trainingszeit</div><h1>${Math.round(minutes / 60 * 10) / 10}<span class="small"> h</span></h1><div class="tiny muted">${streak} Wo. in Folge aktiv</div></div></div>
-    <div class="card stack"><h3>Wochenbelastung</h3><svg class="chart" viewBox=${`0 0 ${W} ${H + 18}`} width="100%" role="img" aria-label="Wochenbelastung: Ziel gegen erledigt">
-      ${data.map((d, i) => { const x = i * bw + bw * 0.15, w = bw * 0.7, th = d.target / maxV * H, dh = d.done / maxV * H, cw = d.w === cur;
-        return html`<g><rect x=${x} y=${H - th} width=${w} height=${th} rx="4" fill="none" stroke="var(--line)" stroke-width="2" />
-          <rect x=${x} y=${H - dh} width=${w} height=${dh} rx="4" fill=${cw ? "var(--accent2)" : "var(--accent)"} />
-          <text x=${x + w / 2} y=${H + 13} text-anchor="middle">${d.w.slice(8)}.${d.w.slice(5, 7)}</text></g>`; })}</svg>
-      <div class="legend"><span><span class="dot" style="background:var(--accent)"></span> erledigt</span><span><span class="dot" style="border:2px solid var(--line)"></span> Wochenziel</span></div></div>
-    ${sportRows.length > 0 && html`<div class="card stack"><h3>Nach Sportart</h3>${sportRows.map(([sp, m]) => html`<div class="stack" style="gap:4px"><div class="row between small"><span>${SPORTS[sp].icon} ${SPORTS[sp].label}</span><span class="muted">${m} Min</span></div><div class="progressbar"><i style=${`width:${m / sportRows[0][1] * 100}%;background:${SPORTS[sp].color}`}></i></div></div>`)}</div>`}
-    ${targets.length > 0 && html`<div class="card stack"><h3>Kraft-Ziele (automatisch)</h3>${targets.map(([n, x]) => html`<div class="rec"><div class="grow"><div class="bold small">${n}</div><div class="tiny muted">${x.reason || ""}</div></div><span class="chip">🎯 ${x.seconds != null ? x.seconds + " Sek." : [x.weight != null ? fmtNum(x.weight) + " kg" : "", x.reps != null ? x.reps + " Wdh." : ""].filter(Boolean).join(" × ")}</span></div>`)}</div>`}
-    ${daily.length >= 3 && html`<div class="card stack"><h3>⌚ Erholung (Garmin)</h3><div class="grid2"><div><div class="tiny muted">Ruhepuls</div><${Spark} values=${daily.map(d => d.restingHr)} color="var(--bad)" /></div><div><div class="tiny muted">Schlaf (h)</div><${Spark} values=${daily.map(d => d.sleepHours)} color="var(--accent2)" /></div></div></div>`}
+  const targets = Object.entries(plan.meta.targets || {}), daily = S.state.garmin.daily.slice(-21), due = sessions.filter(s => s.date < t || s.status === "done").length;
+  const W = 320, H = 120, bw = W / Math.max(1, data.length);
+  return html`<div class="screen stack gap-lg"><div><div class="eyebrow">${plan.title}</div><h1 style="margin-top:6px">Fortschritt</h1></div>
+    <div class="card"><div class="stats" style="grid-template-columns:repeat(3,1fr)"><div class="stat"><div class="k">Einheiten</div><div class="v">${done.length}</div><div class="d">von ${due} fälligen</div></div>
+      <div class="stat"><div class="k">Trainingszeit</div><div class="v">${Math.round(minutes / 6) / 10} h</div><div class="d">gesamt</div></div>
+      <div class="stat"><div class="k">Serie</div><div class="v">${streak}</div><div class="d">Wochen aktiv</div></div></div></div>
+    <div class="section"><span class="label">Wochenbelastung</span><div class="card stack"><svg class="chart" viewBox=${`0 0 ${W} ${H + 16}`} width="100%" role="img" aria-label="Wochenbelastung: Ziel gegen erledigt">
+      ${data.map((d, i) => { const x = i * bw + bw * 0.18, w = bw * 0.64, th = d.target / maxV * H, dh = d.done / maxV * H;
+        return html`<g><rect x=${x} y=${H - th} width=${w} height=${th} rx="3" fill="none" stroke="var(--line)" stroke-width="1.5" /><rect x=${x} y=${H - dh} width=${w} height=${dh} rx="3" fill=${d.w === cur ? "var(--accent)" : "var(--ink)"} />
+          <text x=${x + w / 2} y=${H + 12} text-anchor="middle">${d.w.slice(8)}.${d.w.slice(5, 7)}</text></g>`; })}</svg>
+      <div class="legend"><span>■ erledigt</span><span>□ Wochenziel</span></div></div></div>
+    ${sportRows.length > 0 && html`<div class="section"><span class="label">Nach Sportart</span><div class="card stack">${sportRows.map(([sp, m]) => html`<div class="stack tight"><div class="row between small"><span class="sport" style="text-transform:none;letter-spacing:0;font-size:.88rem;color:var(--text)"><i style=${`background:${SPORTS[sp].color}`}></i>${SPORTS[sp].label}</span><span class="muted">${m} Min</span></div><div class="meter"><i style=${`width:${m / sportRows[0][1] * 100}%;background:${SPORTS[sp].color}`}></i></div></div>`)}</div></div>`}
+    ${targets.length > 0 && html`<div class="section"><span class="label">Kraft-Ziele</span><div class="list">${targets.map(([nm, x]) => html`<div class="li"><div class="grow"><div class="t">${nm}</div><div class="s">${x.reason || ""}</div></div><span class="tag">${x.seconds != null ? x.seconds + " Sek." : [x.weight != null ? fmtNum(x.weight) + " kg" : "", x.reps != null ? x.reps + " Wdh." : ""].filter(Boolean).join(" × ")}</span></div>`)}</div></div>`}
+    ${daily.length >= 3 && html`<div class="section"><span class="label">Erholung · 3 Wochen</span><div class="card"><div class="grid2"><div><div class="tiny muted">Ruhepuls</div><${Spark} values=${daily.map(d => d.restingHr)} /></div><div><div class="tiny muted">Schlaf</div><${Spark} values=${daily.map(d => d.sleepHours)} color="var(--accent)" /></div></div></div></div>`}
   </div>`;
 }
 
 function GarminCard() {
   const cloud = S.state.adapter && S.state.adapter.mode === "cloud";
-  const [busy, setBusy] = useState(false), [msg, setMsg] = useState(""), [key, setKey] = useState(""), [guide, setGuide] = useState(false);
+  const [busy, setBusy] = useState(false), [msg, setMsg] = useState(""), [key, setKey] = useState(""), [guide, setGuide] = useState(false), [diag, setDiag] = useState("");
   const g = S.state.garmin, link = S.state.link, connected = link && link.status === "connected", last = g.daily.length ? g.daily[g.daily.length - 1].date : null;
-  const run = fn => async () => { setBusy(true); setMsg(""); try { await fn(); } catch (e) { setMsg("⚠ " + e.message); } setBusy(false); };
-  const connect = run(async () => { await S.garminApi.connect(key.trim()); setKey(""); await S.refreshLink(); setMsg("✓ Key geprüft und verschlüsselt gespeichert."); });
-  const sync = run(async () => { const r = await S.garminApi.sync(30); await S.reloadGarmin(); const bad = Object.entries(r.report || {}).filter(([, v]) => v.ok === 0 && v.failed > 0).map(([k, v]) => `${k} (HTTP ${v.lastStatus})`); setMsg(`✓ ${r.activities} Aktivitäten, ${r.daily} Tageswerte synchronisiert.${bad.length ? " Nicht abrufbar: " + bad.join(", ") + " – siehe Diagnose." : ""}`); });
-  const [diag, setDiag] = useState("");
+  const run = fn => async () => { setBusy(true); setMsg(""); try { await fn(); } catch (e) { setMsg("Fehler: " + e.message); } setBusy(false); };
+  const connect = run(async () => { await S.garminApi.connect(key.trim()); setKey(""); await S.refreshLink(); setMsg("Key geprüft und verschlüsselt gespeichert."); });
+  const sync = run(async () => { const r = await S.garminApi.sync(30); await S.reloadGarmin(); const bad = Object.entries(r.report || {}).filter(([, v]) => v.ok === 0 && v.failed > 0).map(([k, v]) => `${k} (HTTP ${v.lastStatus})`); setMsg(`${r.activities} Aktivitäten, ${r.daily} Tageswerte synchronisiert.${bad.length ? " Nicht abrufbar: " + bad.join(", ") + " – siehe Diagnose." : ""}`); });
   const runDiag = run(async () => { const r = await S.garminApi.diagnose(); setDiag(JSON.stringify(r, null, 1)); });
   const disc = run(async () => { await S.garminApi.disconnect(); await S.refreshLink(); S.toast("Garmin getrennt, Key gelöscht.", "info"); });
-  const onFile = async e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (!f) return; setBusy(true); setMsg(""); try { const r = await S.importGarminFile(await f.text()); setMsg(`✓ ${r.activities} Aktivitäten, ${r.daily} Tageswerte importiert.`); } catch (err) { setMsg("⚠ " + err.message); } setBusy(false); };
-  return html`<div class="card stack"><div class="row"><span style="font-size:1.6rem">⌚</span><div class="grow"><h3>Garmin Connect</h3><div class="small muted">Aktivitäten, Schlaf, HRV, Ruhepuls & Body Battery bremsen oder erlauben Steigerungen.</div></div></div>
-    ${g.activities.length || g.daily.length ? html`<div class="row wrap"><span class="chip good">${g.activities.length} Aktivitäten</span><span class="chip">${g.daily.length} Tageswerte</span>${last && html`<span class="chip">bis ${last}</span>`}</div>` : null}
-    ${!cloud && html`<div class="banner small">Die direkte Verbindung (Personal API) braucht ein Cloud-Konto. Im Demo-Modus nur Datei-Import.</div>`}
-    ${cloud && connected && html`<div class="row wrap"><span class="chip good">Key gespeichert</span>${link.last_sync_at && html`<span class="chip">Sync: ${String(link.last_sync_at).slice(0, 16).replace("T", " ")}</span>`}${link.last_error && html`<span class="chip warn">${String(link.last_error).slice(0, 60)}</span>`}</div>
-      <div class="row"><button class="btn primary grow" disabled=${busy} onClick=${sync}>${busy ? "…" : "Jetzt synchronisieren"}</button><button class="btn danger" disabled=${busy} onClick=${disc}>Trennen</button></div>
-      <button class="btn sm ghost" disabled=${busy} onClick=${runDiag}>Diagnose (Struktur der Garmin-Antworten)</button>
-      ${diag && html`<div class="stack" style="gap:6px"><pre class="tiny" style="margin:0;max-height:260px;overflow:auto;background:var(--surface2);padding:10px;border-radius:12px;white-space:pre-wrap;word-break:break-word">${diag}</pre><button class="btn sm" onClick=${() => { navigator.clipboard && navigator.clipboard.writeText(diag).then(() => S.toast("Kopiert.", "info")); }}>Kopieren</button><p class="tiny muted">Enthält nur Feldnamen und Typen, keine persönlichen Werte.</p></div>`}`}
-    ${cloud && link && link.status === "error" && html`<div class="banner small">Der gespeicherte Key wurde von Garmin abgelehnt. Erzeuge einen neuen Key und füge ihn unten ein.</div>`}
-    ${cloud && !connected && html`<div class="stack"><button class="btn sm" onClick=${() => setGuide(!guide)}>${guide ? "Anleitung ausblenden" : "So bekommst du deinen Personal API Key"}</button>
-      ${guide && html`<ol class="small muted" style="margin:0;padding-left:20px;line-height:1.6"><li>In Garmin Connect (Web) anmelden und die Seite <b>Personal API Key</b> öffnen.</li><li><b>Create Key</b> wählen, Bedingungen lesen und akzeptieren.</li><li>Ablaufdauer wählen und <b>Create</b> klicken.</li><li>Der Key wird <b>nur einmal</b> angezeigt: kopieren und hier einfügen.</li></ol>`}
-      <label class="field">Personal API Key<input type="password" autocomplete="off" spellcheck="false" placeholder="Key hier einfügen" value=${key} onInput=${e => setKey(e.target.value)} /></label>
+  const onFile = async e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (!f) return; setBusy(true); setMsg(""); try { const r = await S.importGarminFile(await f.text()); setMsg(`${r.activities} Aktivitäten, ${r.daily} Tageswerte importiert.`); } catch (err) { setMsg("Fehler: " + err.message); } setBusy(false); };
+  return html`<div class="card stack"><div class="row between"><h3>Garmin Connect</h3>${connected ? html`<span class="tag good">verbunden</span>` : link && link.status === "error" ? html`<span class="tag bad">Key abgelehnt</span>` : html`<span class="tag">nicht verbunden</span>`}</div>
+    ${g.activities.length || g.daily.length ? html`<p class="small muted">${g.activities.length} Aktivitäten · ${g.daily.length} Tageswerte${last ? " · bis " + fmtDay(last) : ""}${connected && link.last_sync_at ? " · Sync " + String(link.last_sync_at).slice(0, 16).replace("T", " ") : ""}</p>` : null}
+    ${connected && link.last_error && html`<p class="small c-warn">${String(link.last_error).slice(0, 120)}</p>`}
+    ${!cloud && html`<p class="small muted">Die direkte Verbindung braucht ein Cloud-Konto. Im Demo-Modus nur Datei-Import.</p>`}
+    ${cloud && connected && html`<div class="row"><button class="btn primary grow" disabled=${busy} onClick=${sync}>${busy ? "…" : "Jetzt synchronisieren"}</button><button class="btn danger" disabled=${busy} onClick=${disc}>Trennen</button></div>
+      <button class="btn ghost sm" style="align-self:flex-start" disabled=${busy} onClick=${runDiag}>Diagnose</button>
+      ${diag && html`<div class="stack tight"><pre class="diag">${diag}</pre><div class="row"><button class="btn sm" onClick=${() => { navigator.clipboard && navigator.clipboard.writeText(diag).then(() => S.toast("Kopiert.", "info")); }}>Kopieren</button><span class="tiny muted">Nur Feldnamen, keine Werte.</span></div></div>`}`}
+    ${cloud && !connected && html`<div class="stack tight"><button class="btn ghost sm" style="align-self:flex-start" onClick=${() => setGuide(!guide)}>${guide ? "Anleitung ausblenden" : "Personal API Key erzeugen"}</button>
+      ${guide && html`<ol class="small muted" style="margin:0 0 6px;padding-left:20px;line-height:1.65"><li>In Garmin Connect (Web) die Seite <b>Personal API Key</b> öffnen.</li><li><b>Create Key</b> wählen, Bedingungen akzeptieren.</li><li>Ablaufdauer wählen und <b>Create</b> klicken.</li><li>Der Key wird <b>nur einmal</b> angezeigt: kopieren und hier einfügen.</li></ol>`}
+      <label class="field">Personal API Key<input type="password" autocomplete="off" spellcheck="false" placeholder="Key einfügen" value=${key} onInput=${e => setKey(e.target.value)} /></label>
       <button class="btn primary" disabled=${busy || key.trim().length < 10} onClick=${connect}>${busy ? "Prüfe …" : "Verbinden"}</button>
-      <p class="tiny muted">Der Key wird nur serverseitig verschlüsselt gespeichert und nie angezeigt oder weitergegeben. Du kannst ihn bei Garmin jederzeit widerrufen.</p></div>`}
+      <p class="tiny muted">Der Key wird nur serverseitig verschlüsselt gespeichert und nie angezeigt. Du kannst ihn bei Garmin jederzeit widerrufen.</p></div>`}
     <label class="field">Export-Datei importieren (garmin_data.json)<input type="file" accept="application/json,.json" disabled=${busy} onChange=${onFile} /></label>
-    ${msg && html`<div class="banner info small">${msg}</div>`}</div>`;
+    ${msg && html`<div class="note">${msg}</div>`}</div>`;
 }
 
 export function Profile({onWizard}) {
   const st = S.state, plan = S.activePlan(), cloud = st.adapter && st.adapter.mode === "cloud", archived = st.plans.filter(p => p.status !== "active");
   const [confirm, setConfirm] = useState(null);
-  const exp = async () => { const d = await S.exportData(); const blob = new Blob([JSON.stringify(d, null, 1)], {type: "application/json"}); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `training-export-${S.today()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
-  return html`<div class="screen stack"><h1>Profil</h1>
-    <div class="card stack"><div class="row"><div class="icon-box" style="background:var(--grad);color:#fff">${(st.user && st.user.email || "?").slice(0, 1).toUpperCase()}</div><div class="grow"><div class="bold">${cloud ? st.user.email : "Demo-Modus"}</div><div class="small muted">${cloud ? "Daten nur für dein Konto sichtbar" : "Ohne Konto – Daten nur in diesem Browser"}</div></div></div>
-      ${cloud && html`<button class="btn" onClick=${S.auth.signOut}>Abmelden</button>`}
-      ${!cloud && html`<div class="banner small">Für Konten, Cloud-Sync, KI-Coach und Garmin die <b>config.js</b> mit deinem Supabase-Projekt füllen (siehe README).</div>`}</div>
-    <div class="card stack"><h3>Trainingsplan</h3>${plan ? html`<div class="rec"><div class="grow"><div class="bold">${plan.title}</div><div class="tiny muted">${fmtDay(plan.startDate)} – ${fmtDay(plan.endDate)}</div></div><span class="chip good">aktiv</span></div>` : html`<p class="muted small">Kein aktiver Plan.</p>`}
-      <button class="btn primary" onClick=${onWizard}>＋ Neuen Plan erstellen</button><p class="tiny muted">Ein neuer Plan archiviert den aktuellen (Daten bleiben erhalten).</p>
-      ${archived.map(p => html`<div class="rec"><div class="grow"><div class="bold small">${p.title}</div><div class="tiny muted">archiviert</div></div><button class="btn sm danger" onClick=${() => setConfirm({type: "plan", id: p.id})}>Löschen</button></div>`)}</div>
-    <${GarminCard} />
-    <div class="card stack"><h3>KI-Coach</h3><label class="opt" style="cursor:pointer"><input type="checkbox" style="width:22px;height:22px" checked=${st.settings.autoApply !== false} onChange=${e => S.setSettings({autoApply: e.target.checked})} /><span><div class="ot">Empfehlungen automatisch übernehmen</div><div class="small muted">Ziele und Umfang passen sich nach jedem Training von selbst an.</div></span></label>
-      <p class="tiny muted">${S.aiAvailable() ? "KI aktiv (kostenloses Modell über deinen Server). Beim Auswerten werden Trainingsdaten an den KI-Anbieter gesendet." : "Ohne Cloud-Konto arbeitet der Coach regelbasiert."}</p></div>
-    <div class="card stack"><h3>Daten & Konto</h3><button class="btn" onClick=${exp}>⬇ Alle Daten exportieren (JSON)</button><button class="btn danger" onClick=${() => setConfirm({type: "data"})}>Alle Trainingsdaten löschen</button>
-      ${cloud && html`<button class="btn danger" onClick=${() => setConfirm({type: "account"})}>Konto endgültig löschen</button>`}
-      <a class="btn ghost" href="./legacy/index.html">Alte Fußball-Reha-Version öffnen</a></div>
+  const exp = async () => { const d = await S.exportData(); const blob = new Blob([JSON.stringify(d, null, 1)], {type: "application/json"}); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `athleta-export-${S.today()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
+  return html`<div class="screen stack gap-lg"><h1>Profil</h1>
+    <div class="section"><span class="label">Konto</span><div class="list"><${Row} title=${cloud ? st.user.email : "Demo-Modus"} sub=${cloud ? "Daten nur für dein Konto sichtbar" : "Ohne Konto – Daten nur in diesem Browser"} />${cloud && html`<${Row} title="Abmelden" onClick=${S.auth.signOut} />`}</div>
+      ${!cloud && html`<p class="small muted">Für Konten, KI-Coach und Garmin die <code>config.js</code> mit deinem Supabase-Projekt füllen (siehe README).</p>`}</div>
+    <div class="section"><span class="label">Trainingsplan</span><div class="list">${plan ? html`<${Row} title=${plan.title} sub=${`${fmtDay(plan.startDate)} – ${fmtDay(plan.endDate)}`} right=${html`<span class="tag good">aktiv</span>`} />` : html`<${Row} title="Kein aktiver Plan" />`}
+      <${Row} title="Neuen Plan erstellen" sub="Der aktuelle Plan wird archiviert, Daten bleiben erhalten" onClick=${onWizard} />
+      ${archived.map(p => html`<${Row} title=${p.title} sub="archiviert" right=${html`<button class="btn sm danger" onClick=${() => setConfirm({type: "plan", id: p.id})}>Löschen</button>`} />`)}</div></div>
+    <div class="section"><span class="label">Garmin</span><${GarminCard} /></div>
+    <div class="section"><span class="label">Coach</span><div class="card stack"><label class="check"><input type="checkbox" checked=${st.settings.autoApply !== false} onChange=${e => S.setSettings({autoApply: e.target.checked})} /><span><div class="bold">Empfehlungen automatisch übernehmen</div><div class="small muted">Ziele und Umfang passen sich nach jedem Training an.</div></span></label>
+      <p class="tiny muted">${S.aiAvailable() ? "KI aktiv. Beim Auswerten werden Trainingsdaten an den KI-Anbieter gesendet." : "Ohne Cloud-Konto arbeitet der Coach regelbasiert."}</p></div></div>
+    <div class="section"><span class="label">Daten</span><div class="list"><${Row} title="Alle Daten exportieren" sub="JSON-Datei" onClick=${exp} /><${Row} title="Alle Trainingsdaten löschen" danger=${true} onClick=${() => setConfirm({type: "data"})} />${cloud && html`<${Row} title="Konto endgültig löschen" danger=${true} onClick=${() => setConfirm({type: "account"})} />`}<${Row} title="Alte Fußball-Reha-Version" href="./legacy/index.html" /></div></div>
     ${confirm && html`<${Sheet} title="Wirklich?" onClose=${() => setConfirm(null)}><div class="stack"><p class="muted">${confirm.type === "account" ? "Dein Konto und alle Daten werden unwiderruflich gelöscht." : confirm.type === "data" ? "Alle Pläne und Einheiten werden gelöscht." : "Dieser Plan und seine Einheiten werden gelöscht."}</p>
-      <button class="btn danger" onClick=${async () => { const c = confirm; setConfirm(null); try { if (c.type === "account") await S.deleteAccount(); else if (c.type === "data") await S.resetData(); else await S.deletePlan(c.id); } catch (e) { S.toast(e.message, "error"); } }}>Ja, löschen</button><button class="btn" onClick=${() => setConfirm(null)}>Abbrechen</button></div><//>`}
+      <button class="btn primary" onClick=${async () => { const c = confirm; setConfirm(null); try { if (c.type === "account") await S.deleteAccount(); else if (c.type === "data") await S.resetData(); else await S.deletePlan(c.id); } catch (e) { S.toast(e.message, "error"); } }}>Ja, löschen</button><button class="btn" onClick=${() => setConfirm(null)}>Abbrechen</button></div><//>`}
   </div>`;
 }
