@@ -77,15 +77,20 @@ export function extractJson(text) {
 export async function callModel(task, payload, env = process.env) {
   const base = (env.AI_BASE_URL || "https://api.groq.com/openai/v1").replace(/\/$/, ""), model = env.AI_MODEL || "llama-3.3-70b-versatile";
   const messages = [{role: "system", content: TASKS[task].system}, {role: "user", content: "Datenblock:\n" + JSON.stringify(payload)}];
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const r = await timedFetch(`${base}/chat/completions`, {method: "POST", headers: {"content-type": "application/json", authorization: `Bearer ${env.AI_API_KEY}`},
-      body: JSON.stringify({model, messages, temperature: 0.3, max_tokens: TASKS[task].max_tokens, response_format: {type: "json_object"}})});
+  const redact = t => String(t || "").split(env.AI_API_KEY).join("…").slice(0, 160);
+  let last = null;
+  // Versuch 1 mit JSON-Modus, Versuch 2 ohne (manche Modelle/Anbieter lehnen response_format ab; der Prompt verlangt JSON ohnehin)
+  for (const jsonMode of [true, false]) {
+    const body = {model, messages, temperature: 0.3, max_tokens: TASKS[task].max_tokens};
+    if (jsonMode) body.response_format = {type: "json_object"};
+    const r = await timedFetch(`${base}/chat/completions`, {method: "POST", headers: {"content-type": "application/json", authorization: `Bearer ${env.AI_API_KEY}`}, body: JSON.stringify(body)});
     if (r.status === 429) { const e = new Error("KI-Anbieter ausgelastet, bitte später erneut versuchen."); e.status = 429; throw e; }
-    if (!r.ok) { const e = new Error("KI-Anbieter nicht erreichbar."); e.status = 502; throw e; }
+    if (!r.ok) { let msg = ""; try { const j = await r.json(); msg = (j.error && (j.error.message || j.error)) || ""; } catch {} last = {status: r.status, msg: redact(typeof msg === "string" ? msg : JSON.stringify(msg))}; continue; }
     const j = await r.json();
-    try { return extractJson(j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content); } catch { /* zweiter Versuch */ }
+    try { return extractJson(j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content); } catch { last = {status: 200, msg: "Antwort war kein gültiges JSON"}; }
   }
-  const e = new Error("KI-Antwort war nicht verwertbar."); e.status = 502; throw e;
+  const e = new Error(last && last.status === 200 ? "KI-Antwort war nicht verwertbar." : `KI-Anbieter nicht erreichbar (HTTP ${last ? last.status : "?"}${last && last.msg ? ": " + last.msg : ""}).`);
+  e.status = 502; throw e;
 }
 
 // Prüft live, ob Supabase, die Datenbankfunktion ai_hit und der KI-Anbieter erreichbar/gültig sind (nur Statuscodes).
@@ -98,7 +103,9 @@ export async function liveCheck(env = process.env) {
     const r = await timedFetch(`${env.SUPABASE_URL}/rest/v1/rpc/ai_hit`, {method: "POST", headers: {"content-type": "application/json", apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`}, body: JSON.stringify({p_user: "00000000-0000-0000-0000-000000000000", p_limit: 1})}, 8000);
     return {status: r.status, exists: r.status !== 404, keyAccepted: r.status !== 401 && r.status !== 403};
   }) : {error: "Variable fehlt"};
-  live.aiProvider = env.AI_API_KEY ? await probe(async () => { const base = (env.AI_BASE_URL || "https://api.groq.com/openai/v1").replace(/\/$/, ""); const r = await timedFetch(`${base}/models`, {headers: {authorization: `Bearer ${env.AI_API_KEY}`}}, 8000); return {status: r.status, keyAccepted: r.ok}; }) : {error: "Variable fehlt"};
+  live.aiProvider = env.AI_API_KEY ? await probe(async () => { const base = (env.AI_BASE_URL || "https://api.groq.com/openai/v1").replace(/\/$/, ""); const r = await timedFetch(`${base}/models`, {headers: {authorization: `Bearer ${env.AI_API_KEY}`}}, 8000); const out = {status: r.status, keyAccepted: r.ok};
+    if (r.ok) { try { const j = await r.json(), ids = (j.data || []).map(m => m.id).filter(Boolean), want = env.AI_MODEL || "llama-3.3-70b-versatile"; out.modelAvailable = ids.includes(want); out.models = ids.slice(0, 40); } catch {} }
+    return out; }) : {error: "Variable fehlt"};
   return live;
 }
 

@@ -28,7 +28,10 @@ test("AI-Handler: Auth, Limit, Aufgabenprüfung, Modellaufruf", async () => {
     });
   });
   const llm = await server((q, r) => {
-    let b = ""; q.on("data", c => b += c); q.on("end", () => { if (q.method === "GET") { r.setHeader("content-type", "application/json"); return r.end("{}"); } const j = JSON.parse(b); seen.model = j.model; seen.auth = q.headers.authorization; seen.msg = j.messages;
+    let b = ""; q.on("data", c => b += c); q.on("end", () => { if (q.method === "GET") { r.setHeader("content-type", "application/json"); return r.end(JSON.stringify({data: [{id: "m"}, {id: "andere"}]})); } const j = JSON.parse(b); seen.rf = (seen.rf || 0) + (j.response_format ? 1 : 0); seen.calls = (seen.calls || 0) + 1;
+      if (seen.rejectJsonMode && j.response_format) { r.statusCode = 400; r.setHeader("content-type", "application/json"); return r.end(JSON.stringify({error: {message: "response_format nicht unterstützt (Schlüssel k)"}})); }
+      if (seen.failAll) { r.statusCode = 404; r.setHeader("content-type", "application/json"); return r.end(JSON.stringify({error: {message: "model not found"}})); }
+      seen.model = j.model; seen.auth = q.headers.authorization; seen.msg = j.messages;
       r.setHeader("content-type", "application/json"); r.end(JSON.stringify({choices: [{message: {content: '{"title":"Halbmarathon-Plan","summary":"Los!","tips":[]}'}}]})); });
   });
   const env = {SUPABASE_URL: `http://127.0.0.1:${sb.address().port}`, SUPABASE_ANON_KEY: "anon", SUPABASE_SERVICE_ROLE_KEY: "svc", AI_API_KEY: "k", AI_BASE_URL: `http://127.0.0.1:${llm.address().port}/v1`, AI_MODEL: "m", AI_DAILY_LIMIT: "2"};
@@ -55,5 +58,18 @@ test("AI-Handler: Auth, Limit, Aufgabenprüfung, Modellaufruf", async () => {
     const ok2 = await call(env, {headers: {authorization: "Bearer good"}, body: {task: "plan_summary", payload: {}}}); assert.equal(ok2.status, 200);
     const limited = await call(env, {headers: {authorization: "Bearer good"}, body: {task: "plan_summary", payload: {}}}); assert.equal(limited.status, 429, "Tageslimit");
     assert.equal((await call({...env, AI_API_KEY: ""}, {headers: {authorization: "Bearer good"}, body: {task: "plan_summary"}})).status, 503);
+    // Anbieter lehnt JSON-Modus ab -> zweiter Versuch ohne response_format gelingt
+    const bigEnv = {...env, AI_DAILY_LIMIT: "1000"}; seen.rejectJsonMode = true; seen.calls = 0;
+    const retry = await call(bigEnv, {headers: {authorization: "Bearer good"}, body: {task: "plan_summary", payload: {}}});
+    assert.equal(retry.status, 200); assert.equal(seen.calls, 2, "Retry ohne JSON-Modus");
+    // Modell existiert nicht -> verständlicher Fehler mit Code und Begründung, ohne den Schlüssel
+    seen.rejectJsonMode = false; seen.failAll = true;
+    const bad = await call(bigEnv, {headers: {authorization: "Bearer good"}, body: {task: "plan_summary", payload: {}}});
+    assert.equal(bad.status, 502); assert.match(bad.body.error, /HTTP 404: model not found/);
+    seen.rejectJsonMode = true; seen.failAll = false;
+    const leak = await call(bigEnv, {headers: {authorization: "Bearer good"}, body: {task: "plan_summary", payload: {}}}); assert.equal(leak.status, 200);
+    seen.failAll = false; seen.rejectJsonMode = false;
+    const live = await call(bigEnv, {method: "GET", url: "/api/ai?check=1"});
+    assert.equal(live.body.live.aiProvider.modelAvailable, true); assert.deepEqual(live.body.live.aiProvider.models, ["m", "andere"]);
   } finally { sb.close(); llm.close(); }
 });
