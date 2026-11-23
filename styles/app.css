@@ -72,6 +72,7 @@ hr{border:0;border-top:1px solid var(--line);margin:4px 0}
 .block{padding:10px 12px;border-radius:14px;background:var(--surface2)}.block b{display:block;font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:2px}
 .ex{padding:12px;border-radius:16px;background:var(--surface2)}.ex .target{color:var(--accent);font-weight:700;font-size:.85rem}
 .setgrid{display:grid;grid-template-columns:34px 1fr 1fr;gap:8px;align-items:center;margin-top:8px}.setgrid .n{font-weight:700;color:var(--muted);text-align:center}
+.rtile{padding:12px;border-radius:16px;background:var(--surface2)}.rval{font-size:1.5rem;font-weight:800;letter-spacing:-.02em;line-height:1.2}.c-good{color:var(--good);font-weight:700}.c-warn{color:var(--warn);font-weight:700}.c-bad{color:var(--bad);font-weight:700}
 .rpe{display:grid;grid-template-columns:repeat(10,1fr);gap:4px}.rpe button{min-height:44px;border-radius:12px;background:var(--surface2);font-weight:700}.rpe button.sel{background:var(--accent);color:#fff}
 .seg{display:flex;flex-wrap:wrap;gap:8px}
 .choices{display:flex;flex-direction:column;gap:8px}.opt.compact{padding:12px 14px;border-width:1.5px;font-weight:600;line-height:1.35}.opt.compact .ck{margin-left:auto;color:var(--accent);font-weight:800;flex:none}
