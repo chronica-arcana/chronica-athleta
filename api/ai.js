@@ -91,6 +91,9 @@ export async function callModel(task, payload, env = process.env) {
 export default async function handler(req, res, env = process.env) {
   res.setHeader("x-content-type-options", "nosniff");
   if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
+  if (req.method === "GET") { // Gesundheitscheck für die Einrichtung: nur ja/nein, keine Werte
+    return json(res, 200, {ok: true, function: "ai", aiKey: !!env.AI_API_KEY, supabaseUrl: !!env.SUPABASE_URL, supabaseAnonKey: !!env.SUPABASE_ANON_KEY, serviceRoleKey: !!env.SUPABASE_SERVICE_ROLE_KEY, model: env.AI_MODEL || "llama-3.3-70b-versatile"});
+  }
   if (req.method !== "POST") return json(res, 405, {error: "Nur POST."});
   if (!env.AI_API_KEY) return json(res, 503, {error: "KI ist auf dem Server nicht konfiguriert."});
   let body; try { body = await readBody(req); } catch { return json(res, 400, {error: "Ungültige Anfrage."}); }

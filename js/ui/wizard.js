@@ -57,7 +57,7 @@ export function Wizard({onClose, first}) {
       const patch = {...d}; if (d.event) patch.event = {...g.event, ...d.event};
       if (d.event && !d.goalType) patch.goalType = "event";
       set(patch); setAiNote("Die KI hat deine Angaben vorausgefüllt – bitte prüfen und anpassen.");
-    } catch (e) { setAiNote("KI nicht erreichbar – bitte die Felder selbst ausfüllen."); }
+    } catch (e) { setAiNote(`KI nicht erreichbar (${e.message}) – bitte die Felder selbst ausfüllen.`); }
     setBusy(false); setStep(1);
   };
   const loadQuestions = async () => {

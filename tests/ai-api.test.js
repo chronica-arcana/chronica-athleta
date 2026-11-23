@@ -33,7 +33,11 @@ test("AI-Handler: Auth, Limit, Aufgabenprüfung, Modellaufruf", async () => {
   });
   const env = {SUPABASE_URL: `http://127.0.0.1:${sb.address().port}`, SUPABASE_ANON_KEY: "anon", SUPABASE_SERVICE_ROLE_KEY: "svc", AI_API_KEY: "k", AI_BASE_URL: `http://127.0.0.1:${llm.address().port}/v1`, AI_MODEL: "m", AI_DAILY_LIMIT: "2"};
   try {
-    assert.equal((await call(env, {method: "GET"})).status, 405);
+    const health = await call(env, {method: "GET"});
+    assert.equal(health.status, 200); assert.deepEqual([health.body.aiKey, health.body.supabaseUrl, health.body.serviceRoleKey], [true, true, true]);
+    assert.ok(!JSON.stringify(health.body).includes("svc") && !JSON.stringify(health.body).includes('"k"'), "keine Geheimnisse im Healthcheck");
+    const bare = await call({}, {method: "GET"}); assert.deepEqual([bare.body.aiKey, bare.body.supabaseUrl, bare.body.serviceRoleKey], [false, false, false]);
+    assert.equal((await call(env, {method: "PUT"})).status, 405);
     assert.equal((await call(env, {body: {task: "plan_summary", payload: {}}})).status, 401, "ohne Login abgelehnt");
     assert.equal((await call(env, {headers: {authorization: "Bearer bad"}, body: {task: "plan_summary"}})).status, 401);
     assert.equal((await call(env, {headers: {authorization: "Bearer good"}, body: {task: "beliebiger_prompt", payload: {}}})).status, 400);
