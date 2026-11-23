@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Holt Trainings- und Erholungsdaten aus Garmin Connect und schreibt garmin_data.json.
+"""FALLBACK: Holt Trainings- und Erholungsdaten aus Garmin Connect lokal auf DEINEM Rechner und schreibt garmin_data.json.
+
+Normalerweise verbindest du Garmin direkt in der App (Profil → Garmin). Falls Garmin Logins vom Server blockiert,
+nutze dieses Skript und importiere die Datei in der App (Profil → Garmin → Datei importieren).
 
 Garmin bietet für Privatpersonen keine offene API (die offizielle Health/Activity API ist
 nur für freigegebene Entwickler-Partner). Dieses Skript nutzt die inoffizielle Bibliothek
@@ -12,8 +15,7 @@ Nutzung (lokal auf deinem Rechner):
     python garmin_sync.py --days 120 --out garmin_data.json
 
 Beim ersten Login werden Tokens in ~/.garminconnect gespeichert (kein erneutes Passwort nötig,
-auch MFA wird abgefragt). Die erzeugte JSON-Datei importierst du in der App im Bereich
-"Garmin & KI-Coach". Lege sie NICHT in ein öffentliches Repository: sie enthält Gesundheitsdaten.
+auch MFA wird abgefragt). Die erzeugte JSON-Datei importierst du in der App unter Profil → Garmin. Lege sie NICHT in ein öffentliches Repository: sie enthält Gesundheitsdaten.
 """
 import argparse
 import json

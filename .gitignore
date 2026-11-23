@@ -1,3 +1,7 @@
 garmin_data.json
 .garminconnect/
 __pycache__/
+node_modules/
+.env
+.env.local
+.vercel

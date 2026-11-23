@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <title>Fußball-Wiedereinstieg · Trainingsplan</title>
+  <style>
+:root{--bg:#f3f5f7;--card:#fff;--text:#17202a;--muted:#66717d;--line:#dfe4e8;--accent:#111827;--accent2:#2563eb;--soft:#eef2f6;--green:#16834a;--yellow:#a66b00;--red:#b42318;--shadow:0 10px 30px rgba(15,23,42,.06)}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.45}.shell{width:min(1180px,calc(100% - 32px));margin:auto}.site-header{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}.header-inner{display:flex;justify-content:space-between;gap:24px;align-items:center;padding:18px 0}.eyebrow,.section-kicker{font-size:11px;font-weight:800;letter-spacing:.12em;color:var(--muted)}h1{margin:3px 0;font-size:clamp(25px,4vw,38px);letter-spacing:-.04em}h2{margin:0;font-size:clamp(20px,3vw,27px);letter-spacing:-.025em}h3{margin:0 0 9px;font-size:18px}p{margin:8px 0;color:var(--muted)}.subtitle{margin:0}.header-status{white-space:nowrap;font-size:13px;color:var(--muted)}.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:7px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:22px;margin:18px 0}.hero-grid{display:grid;grid-template-columns:1.25fr .75fr;gap:18px;margin-top:20px}.intro-card h2{max-width:720px}.notice{margin-top:16px;padding:13px 15px;border:1px solid #dce3ea;border-radius:12px;background:#f8fafc;font-size:14px}.notice.warning{border-color:#ecdca7;background:#fffaf0}.dashboard-card{display:flex;flex-direction:column}.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}.metric{background:var(--soft);border-radius:13px;padding:12px}.metric span{display:block;color:var(--muted);font-size:12px}.metric strong{display:block;font-size:24px;margin-top:3px}.progress{height:8px;background:#e7ebef;border-radius:99px;overflow:hidden}.progress.large{margin:2px 0 16px}.bar{height:100%;width:0;background:var(--accent2);transition:width .25s}.full{width:100%}.warmup-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:15px}.warmup-grid>div{border:1px solid var(--line);border-radius:14px;padding:14px}.step{display:inline-grid;place-items:center;width:27px;height:27px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:800;margin-bottom:10px}.warmup-grid strong{display:block}.warmup-grid p{font-size:13px}.section-head{display:flex;justify-content:space-between;gap:15px;align-items:flex-start}.tabs{display:flex;gap:7px;overflow-x:auto;padding:10px 0 4px;scrollbar-width:thin}.tabs button{flex:0 0 auto}.week-tabs button{min-width:105px}.day-tabs{border-top:1px solid var(--line);margin-top:4px}.day-tabs button{background:#f7f8fa}.day-tabs button.active{background:var(--accent);color:#fff}.button,button{font:inherit}button{border:1px solid var(--line);background:#fff;color:var(--text);border-radius:10px;padding:9px 13px;cursor:pointer;font-weight:700}button:hover{filter:brightness(.98)}button.primary,button.active{background:var(--accent);color:#fff;border-color:var(--accent)}button.secondary{background:#fff}button.danger{color:var(--red)}.plan-box{border:1px solid var(--line);border-radius:15px;padding:17px;margin-top:14px}.session-summary,.item-meta{display:flex;gap:7px;flex-wrap:wrap}.pill{display:inline-flex;align-items:center;background:var(--soft);border-radius:999px;padding:4px 9px;font-size:12px;color:#4b5563}.small{font-size:13px;color:var(--muted)}.session-head{display:flex;justify-content:space-between;gap:12px;align-items:start}.session-date{margin:13px 0;display:grid;grid-template-columns:150px 1fr 1fr 130px;gap:10px;align-items:end}.field label,label{display:block;font-size:12px;font-weight:750;color:var(--muted)}input,select,textarea{width:100%;margin-top:5px;border:1px solid #cfd6dd;border-radius:9px;padding:9px 10px;background:#fff;color:var(--text);font:inherit}textarea{resize:vertical}.exercise-list{display:grid;gap:10px}.exercise-row{border:1px solid var(--line);border-radius:13px;padding:12px}.exercise-main{display:flex;justify-content:space-between;gap:15px}.exercise-name{font-weight:800}.exercise-desc{font-size:12px;color:var(--muted);margin-top:3px}.set-table{width:100%;border-collapse:collapse;margin-top:9px}.set-table th,.set-table td{padding:6px;border-bottom:1px solid #edf0f2;text-align:left;vertical-align:middle;font-size:12px}.set-table th{color:var(--muted)}.set-table input{margin:0;min-width:0;padding:7px}.set-grid{display:grid;grid-template-columns:52px 1fr 1fr;gap:7px;align-items:center;margin-top:7px}.set-grid .set-head{font-size:11px;color:var(--muted);font-weight:700}.tag{font-size:11px;background:#f1f4f7;border-radius:7px;padding:4px 6px;text-align:center}.session-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.adaptation-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:12px}.zone-card{border-radius:14px;padding:15px;border:1px solid var(--line)}.zone-green{background:#f1faf5;border-color:#b9e1ca}.zone-yellow{background:#fff9ed;border-color:#efdba8}.zone-red{background:#fff3f2;border-color:#efc5c1}.zone-card strong{font-size:18px}.recommendations{margin-top:12px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#fafbfc}.hidden{display:none}.rpe-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:14px}.rpe-grid div{padding:11px;border:1px solid var(--line);border-radius:12px;background:#fafbfc}.rpe-grid b{display:block;font-size:18px}.rpe-grid span{font-size:11px;color:var(--muted)}.extra-item{display:flex;justify-content:space-between;gap:15px;padding:13px 0;border-bottom:1px solid var(--line)}.extra-item:last-child{border-bottom:0}.empty{padding:14px;background:#f8fafc;border-radius:12px;color:var(--muted)}.danger-zone{display:flex;justify-content:space-between;align-items:center}.modal{position:fixed;inset:0;z-index:50;display:grid;place-items:center}.modal.hidden{display:none}.modal-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.45)}.modal-card{position:relative;width:min(620px,calc(100% - 24px));max-height:90vh;overflow:auto;background:#fff;border-radius:18px;padding:20px;box-shadow:0 25px 80px rgba(0,0,0,.2)}.form-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.modal form>label{margin-top:12px}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}.icon-btn{font-size:22px;padding:4px 10px}.phase-note{padding:11px 13px;border-radius:11px;background:#f7f8fa;margin:10px 0;font-size:13px}.criteria{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.criteria span{font-size:11px;border:1px solid var(--line);border-radius:999px;padding:4px 8px;background:#fff}
+@media(max-width:900px){.hero-grid,.session-grid,.adaptation-grid{grid-template-columns:1fr}.warmup-grid{grid-template-columns:1fr 1fr}.rpe-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:620px){.shell{width:min(100% - 20px,1180px)}.site-header{position:static}.header-inner{align-items:flex-start;flex-direction:column;padding:14px 0}.card{padding:15px;border-radius:14px}.hero-grid{gap:10px}.metric-grid{gap:8px}.metric strong{font-size:20px}.section-head,.danger-zone{flex-direction:column;align-items:stretch}.warmup-grid{grid-template-columns:1fr}.session-date{grid-template-columns:1fr 1fr}.session-date .date-wide{grid-column:1/-1}.exercise-main{display:block}.set-grid{grid-template-columns:42px 1fr 1fr}.tabs{padding-bottom:6px}.week-tabs button{min-width:90px}.day-tabs button{min-width:125px}.extra-item{align-items:flex-start}.form-grid{grid-template-columns:1fr}.rpe-grid{grid-template-columns:1fr 1fr}.plan-box{padding:12px} }
+.coach-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.coach-box{margin-top:14px}.coach-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.coach-result{margin-top:12px}.target-badge{display:inline-block;margin-top:8px;font-size:12px;font-weight:800;color:#1d4ed8;background:#eaf1ff;border-radius:8px;padding:4px 9px}.adapt-banner{padding:10px 13px;border-radius:11px;background:#eaf1ff;border:1px solid #c7d8fb;font-size:13px;margin:10px 0}.rec-list{margin:12px 0;display:grid;gap:8px}.rec-row{display:flex;justify-content:space-between;gap:14px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff}.rec-side{text-align:right;flex:0 0 auto}.rec-target{font-size:13px;font-weight:800;margin-top:4px}.rec-increase_weight,.rec-increase_reps{background:#dff3e7;color:#0f5f35}.rec-reduce{background:#fde4e1;color:#8a1c12}.rec-hold{background:#fff1cf;color:#7a4e00}.tips{margin:8px 0;padding-left:20px;color:var(--muted);font-size:13px}.coach-foot{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px}.pill-success{background:#dff3e7;color:#0f5f35}.status-bad{color:var(--red)}code{background:var(--soft);border-radius:5px;padding:1px 5px;font-size:12px}
+@media(max-width:900px){.coach-grid{grid-template-columns:1fr}}
+@media(max-width:620px){.rec-row{flex-direction:column}.rec-side{text-align:left}}
+
+</style>
+</head>
+<body>
+<header class="site-header">
+  <div class="shell header-inner">
+    <div>
+      <div class="eyebrow">REHAB · FITNESS · RETURN TO FOOTBALL</div>
+      <h1>⚽ Fußball-Wiedereinstieg</h1>
+      <p class="subtitle">September 2026 → Januar 2027 · 17 Wochen · Schrittweise zurück ins Mannschaftstraining</p>
+    </div>
+    <div class="header-status"><span class="status-dot"></span><span id="saveStatus">✓ Automatisch gespeichert</span></div>
+  </div>
+</header>
+
+<main class="shell">
+  <section class="hero-grid">
+    <article class="card intro-card">
+      <div class="section-kicker">STARTPUNKT</div>
+      <h2>Langsam aufbauen, Belastbarkeit vor Tempo.</h2>
+      <p>Der Befund beschreibt rechts einen Flüssigkeitsstreifen am anteroinferioren Rand des Os pubis an der Symphyse (secondary cleft sign) mit minimalem Ödem im Insertionsgebiet von M. rectus abdominis und Adduktoren. Das passt zu einer Belastungsproblematik im Bereich der Symphyse/pubischen Aponeurose und der Adduktoren; der Bildbefund allein legt jedoch nicht die klinische Diagnose oder Belastbarkeit fest. Deshalb ist der Plan symptom- und kriteriumsorientiert.</p>
+      <div class="notice warning"><strong>Medizinischer Rahmen:</strong> Der Plan ersetzt keine Untersuchung oder Freigabe durch Arzt/Sportphysio. Wegen des Befunds an Symphyse/Adduktoren werden Sprint, harte Richtungswechsel, explosive Sprünge und aggressive Adduktions-/Dehnreize erst spät und nur bei guter Verträglichkeit eingeführt. Bei zunehmendem Schmerz, Hinken, Kraftverlust oder deutlicher Verschlechterung am Folgetag Belastung nicht steigern.</div>
+    </article>
+    <article class="card dashboard-card">
+      <div class="section-kicker">ÜBERSICHT</div>
+      <div class="metric-grid">
+        <div class="metric"><span>Planfortschritt</span><strong id="overallProgress">0%</strong></div>
+        <div class="metric"><span>Einheiten</span><strong id="completedSessions">0</strong></div>
+        <div class="metric"><span>Ø RPE</span><strong id="avgRpe">–</strong></div>
+        <div class="metric"><span>Zusatztrainings</span><strong id="extraCount">0</strong></div>
+      </div>
+      <div class="progress large"><div class="bar" id="overallBar"></div></div>
+      <button class="primary full" id="recommendBtn">✨ Ergänzende Trainings empfehlen</button>
+      <div id="recommendations" class="recommendations hidden"></div>
+    </article>
+  </section>
+
+  <section class="card warmup-card">
+    <div class="section-kicker">VOR JEDEM KRAFTTRAINING</div>
+    <h2>Spezifisches Warm-up im Fitnessstudio</h2>
+    <p class="small">Die Anfahrt mit dem Rad zählt als allgemeines Warm-up. Im Studio danach kurz und spezifisch vorbereiten. Keine aggressive Dehnung oder maximale Adduktionsarbeit im schmerzhaften Bereich.</p>
+    <div class="warmup-grid">
+      <div><span class="step">01</span><strong>3–5 Min. locker</strong><p>Fahrrad oder Laufband bei niedriger Intensität. Gleichmäßige Bewegung, keine Intervalle.</p></div>
+      <div><span class="step">02</span><strong>Mobilisieren</strong><p>Becken kippen, kontrollierte Hüftkreise, Kniebeugen ohne Zusatzlast. Bewegungsumfang nur im gut verträglichen Bereich.</p></div>
+      <div><span class="step">03</span><strong>Aktivieren</strong><p>Glute Bridge, seitliches Bandgehen und leichte Adduktions-/Abduktionsarbeit. 1–2 kurze Sätze, nicht ermüden.</p></div>
+      <div><span class="step">04</span><strong>Aufwärmsätze</strong><p>Bei der ersten Kraftübung 1–2 sehr leichte Sätze vor den Arbeitssätzen. Erst dann Trainingsgewicht wählen.</p></div>
+    </div>
+  </section>
+
+  <section class="card plan-card">
+    <div class="section-head">
+      <div><div class="section-kicker">17-WOCHEN-PLAN</div><h2>Woche auswählen</h2></div>
+      <button class="secondary" id="addTrainingTop">＋ Zusatztraining</button>
+    </div>
+    <div id="jsDiag" class="save-status" style="margin:10px 0 14px">⚠ JavaScript noch nicht aktiv – Woche 1 ist als statische Sicherheitskopie sichtbar. Prüfe, ob <strong>app.js</strong> im selben GitHub-Ordner wie index.html liegt.</div>
+    <div class="tabs week-tabs" id="weekTabs"><button class="active" onclick="selectWeek(0)">Woche 1</button><button class="" onclick="selectWeek(1)">Woche 2</button><button class="" onclick="selectWeek(2)">Woche 3</button><button class="" onclick="selectWeek(3)">Woche 4</button><button class="" onclick="selectWeek(4)">Woche 5</button><button class="" onclick="selectWeek(5)">Woche 6</button><button class="" onclick="selectWeek(6)">Woche 7</button><button class="" onclick="selectWeek(7)">Woche 8</button><button class="" onclick="selectWeek(8)">Woche 9</button><button class="" onclick="selectWeek(9)">Woche 10</button><button class="" onclick="selectWeek(10)">Woche 11</button><button class="" onclick="selectWeek(11)">Woche 12</button><button class="" onclick="selectWeek(12)">Woche 13</button><button class="" onclick="selectWeek(13)">Woche 14</button><button class="" onclick="selectWeek(14)">Woche 15</button><button class="" onclick="selectWeek(15)">Woche 16</button><button class="" onclick="selectWeek(16)">Woche 17</button></div>
+    <div class="tabs day-tabs" id="dayTabs"><button class="active" onclick="selectTab('t1')">🏋️ Tag 1</button><button class="" onclick="selectTab('t2')">🚴 Tag 2</button><button class="" onclick="selectTab('yoga')">🧘 Yoga</button></div>
+    <div id="weekContent"><div class="plan-box"><div class="session-head"><div><div class="section-kicker">Phase 1 · Beruhigen & Belastbarkeit</div><h3>🏋️ Tag 1 · Kraft & Laufband</h3></div><span class="pill">07.09.2026 – 13.09.2026</span></div>
+ <div class="phase-note"><strong>Wochenziel:</strong> Alltagsbelastung stabilisieren, schmerzarmen Bewegungsumfang nutzen und Grundkraft ohne hohe Scher-/Explosivbelastung aufbauen.</div>
+ <div class="session-date"><div class="date-wide"><label>Trainingsdatum<input type="date" value="" placeholder=""  oninput="setVal('w1_t1_date',this.value)"></label></div><label>Start<input type="time" value="" placeholder=""  oninput="setVal('w1_t1_start',this.value)"></label><label>Ende<input type="time" value="" placeholder=""  oninput="setVal('w1_t1_end',this.value)"></label><label>RPE gesamt (1–10)<input type="number" value="" placeholder="z. B. 6" min="1" max="10" oninput="setVal('w1_t1_rpe',this.value)"><small>Eine Zahl für die gesamte Einheit – Lauf, Kraft, Athletik und Pausen zusammen.</small></label></div><p><strong>Laufband:</strong> 10 Min. Gehen/lockeres Joggen; insgesamt 15–20 Min. · kein Tempo</p><div class="form-grid"><label>Laufband: Zeit / km / Tempo<input type="text" value="" placeholder="z. B. 25 Min / 3 km"  oninput="setVal('w1_t1_run',this.value)"></label><label>Laufgefühl / Beschwerden<input type="text" value="" placeholder="z. B. stabil, kein Ziehen"  oninput="setVal('w1_t1_notes',this.value)"></label></div><div class="progress"><div class="bar" id="bar-w1_t1"></div></div><p class="small" id="prog-w1_t1"></p></div><div class="plan-box"><h3>Kraft & Athletik</h3><p class="small">Jeder Satz wird einzeln dokumentiert. Bei Gewichtsübungen kannst du das Gewicht pro Satz ändern; bei Zeitübungen wird die Dauer pro Satz erfasst. Übungs-Notizen wurden bewusst entfernt.</p><div class="exercise-list"><div class="exercise-row"><div class="exercise-main"><div><div class="exercise-name">Beinpresse</div><div class="exercise-desc">Leicht bis moderat, kontrollierte Tiefe.</div><div class="small"><strong>Fokus:</strong> Kraftbasis; keine provokative Hüft-/Leistenposition.</div></div><span class="pill">2 × 10–12</span></div><div class="set-grid"><div class="set-head">Satz</div><div class="set-head">Gewicht</div><div class="set-head">Wiederholungen</div></div><div class="set-grid"><div class="tag">1</div><input type="text" value="" placeholder="kg"  oninput="setVal('w1_ex0_set1_weight',this.value)"><input type="number" value="" placeholder="Wdh." min="0" step="1" oninput="setVal('w1_ex0_set1_reps',this.value)"></div><div class="set-grid"><div class="tag">2</div><input type="text" value="" placeholder="kg"  oninput="setVal('w1_ex0_set2_weight',this.value)"><input type="number" value="" placeholder="Wdh." min="0" step="1" oninput="setVal('w1_ex0_set2_reps',this.value)"></div></div><div class="exercise-row"><div class="exercise-main"><div><div class="exercise-name">Rumänisches Kreuzheben</div><div class="exercise-desc">Kurzer bis mittlerer Bewegungsumfang, Hüfte nach hinten.</div><div class="small"><strong>Fokus:</strong> Hintere Kette; kein Dehnungsschmerz im Leistenbereich.</div></div><span class="pill">2 × 8–10</span></div><div class="set-grid"><div class="set-head">Satz</div><div class="set-head">Gewicht</div><div class="set-head">Wiederholungen</div></div><div class="set-grid"><div class="tag">1</div><input type="text" value="" placeholder="kg"  oninput="setVal('w1_ex1_set1_weight',this.value)"><input type="number" value="" placeholder="Wdh." min="0" step="1" oninput="setVal('w1_ex1_set1_reps',this.value)"></div><div class="set-grid"><div class="tag">2</div><input type="text" value="" placeholder="kg"  oninput="setVal('w1_ex1_set2_weight',this.value)"><input type="number" value="" placeholder="Wdh." min="0" step="1" oninput="setVal('w1_ex1_set2_reps',this.value)"></div></div><div class="exercise-row"><div class="exercise-main"><div><div class="exercise-name">Glute Bridge</div><div class="exercise-desc">Hüfte ruhig heben und senken.</div><div class="small"><strong>Fokus:</strong> Gesäß und Beckenstabilität.</div></div><span class="pill">3 × 10–12</span></div><div class="set-grid"><div class="set-head">Satz</div><div class="set-head">Gewicht</div><div class="set-head">Wiederholungen</div></div><div class="set-grid"><div class="tag">1</div><input type="text" value="" placeholder="kg"  oninput="setVal('w1_ex2_set1_weight',this.value)"><input type="number" value="" placeholder="Wdh." min="0" step="1" oninput="setVal('w1_ex2_set1_reps',this.value)"></div><div class="set-grid"><div class="tag">2</div><input type="text" value="" placeholder="kg"  oninput="setVal('w1_ex2_set2_weight',this.value)"><input type="number" value="" placeholder="Wdh." min="0" step="1" oninput="setVal('w1_ex2_set2_reps',this.value)"></div><div class="set-grid"><div class="tag">3</div><input type="text" value="" placeholder="kg"  oninput="setVal('w1_ex2_set3_weight',this.value)"><input type="number" value="" placeholder="Wdh." min="0" step="1" oninput="setVal('w1_ex2_set3_reps',this.value)"></div></div><div class="exercise-row"><div class="exercise-main"><div><div class="exercise-name">Wadenheben</div><div class="exercise-desc">Kontrollierte volle Bewegung.</div><div class="small"><strong>Fokus:</strong> Unterschenkel.</div></div><span class="pill">3 × 12–15</span></div><div class="set-grid"><div class="set-head">Satz</div><div class="set-head">Gewicht</div><div class="set-head">Wiederholungen</div></div><div class="set-grid"><div class="tag">1</div><input type="text" value="" placeholder="kg"  oninput="setVal('w1_ex3_set1_weight',this.value)"><input type="number" value="" placeholder="Wdh." min="0" step="1" oninput="setVal('w1_ex3_set1_reps',this.value)"></div><div class="set-grid"><div class="tag">2</div><input type="text" value="" placeholder="kg"  oninput="setVal('w1_ex3_set2_weight',this.value)"><input type="number" value="" placeholder="Wdh." min="0" step="1" oninput="setVal('w1_ex3_set2_reps',this.value)"></div><div class="set-grid"><div class="tag">3</div><input type="text" value="" placeholder="kg"  oninput="setVal('w1_ex3_set3_weight',this.value)"><input type="number" value="" placeholder="Wdh." min="0" step="1" oninput="setVal('w1_ex3_set3_reps',this.value)"></div></div><div class="exercise-row"><div class="exercise-main"><div><div class="exercise-name">Pallof Press</div><div class="exercise-desc">Rumpf ruhig halten.</div><div class="small"><strong>Fokus:</strong> Anti-Rotation.</div></div><span class="pill">2 × 10 je Seite</span></div><div class="set-grid"><div class="set-head">Satz</div><div class="set-head">Gewicht</div><div class="set-head">Wiederholungen</div></div><div class="set-grid"><div class="tag">1</div><input type="text" value="" placeholder="kg"  oninput="setVal('w1_ex4_set1_weight',this.value)"><input type="number" value="" placeholder="Wdh." min="0" step="1" oninput="setVal('w1_ex4_set1_reps',this.value)"></div><div class="set-grid"><div class="tag">2</div><input type="text" value="" placeholder="kg"  oninput="setVal('w1_ex4_set2_weight',this.value)"><input type="number" value="" placeholder="Wdh." min="0" step="1" oninput="setVal('w1_ex4_set2_reps',this.value)"></div></div><div class="exercise-row"><div class="exercise-main"><div><div class="exercise-name">Adduktor-Isometrie leicht</div><div class="exercise-desc">Sehr sanfter Druck gegen Ball/Pad; nicht maximal.</div><div class="small"><strong>Fokus:</strong> Nur schmerzarm und nur wenn von Behandler freigegeben.</div></div><span class="pill">3 × 20–30 Sek.</span></div><div class="set-grid"><div class="set-head">Satz</div><div class="set-head">Dauer</div><div class="set-head">Einheit</div></div><div class="set-grid"><div class="tag">1</div><input type="text" value="" placeholder="z. B. 40 Sek."  oninput="setVal('w1_ex5_set1_time',this.value)"><span class="set-unit">Sek.</span></div><div class="set-grid"><div class="tag">2</div><input type="text" value="" placeholder="z. B. 40 Sek."  oninput="setVal('w1_ex5_set2_time',this.value)"><span class="set-unit">Sek.</span></div><div class="set-grid"><div class="tag">3</div><input type="text" value="" placeholder="z. B. 40 Sek."  oninput="setVal('w1_ex5_set3_time',this.value)"><span class="set-unit">Sek.</span></div></div></div></div></div>
+  </section>
+
+  <section class="card insights-card">
+    <div class="section-kicker">AUTOMATISCHE STEUERUNG</div>
+    <h2>Belastung & nächste Woche</h2>
+    <p>Die App nutzt die zuletzt dokumentierten Einheiten, das RPE der gesamten Einheit (nicht einzelne Übungen), Dauer und Hinweise auf Beschwerden. Sie verändert nie rückwirkend den Plan: Anpassungen (Zielgewichte, Umfang) gelten immer erst für die nächsten Einheiten. Garmin-Erholungswerte fließen mit ein.</p>
+    <div id="adaptationPanel" class="adaptation-panel"></div>
+  </section>
+
+  <section class="card coach-card" id="coachSection">
+    <div class="section-kicker">GARMIN &amp; KI-COACH</div>
+    <h2>Daten verbinden · Plan automatisch anpassen</h2>
+    <p>Nach jeder Einheit wertet der Coach Sätze, RPE, Schmerz und deine Garmin-Daten (Aktivität, Trainingseffekt, Schlaf, HRV, Ruhepuls, Body Battery) aus und schlägt vor, was du beim nächsten Mal ändern solltest – z. B. mehr Gewicht oder mehr Wiederholungen. Die Anpassungen erscheinen als 🎯 Ziel direkt im Plan.</p>
+    <div class="coach-grid">
+      <div class="plan-box">
+        <h3>1 · Garmin-Daten</h3>
+        <p class="small">Garmin bietet keine offene persönliche Browser-API. Darum erzeugt das Skript <code>garmin_sync.py</code> (siehe README) auf deinem Rechner die Datei <code>garmin_data.json</code>, die du hier importierst.</p>
+        <label>garmin_data.json importieren<input type="file" id="garminFile" accept="application/json,.json"></label>
+        <p><button class="secondary" id="garminFetchBtn">Von dieser Seite laden (./garmin_data.json)</button></p>
+        <p class="small" id="garminStatus">Noch keine Garmin-Daten importiert.</p>
+      </div>
+      <div class="plan-box">
+        <h3>2 · KI-Empfehlungen (optional)</h3>
+        <p class="small">Ohne Key arbeitet die App mit festen Progressionsregeln. Mit Anthropic-API-Key formuliert Claude die Empfehlungen; die Sicherheitsregeln (keine Steigerung bei Schmerz/hoher Belastung, max. +10 % Gewicht) gelten weiterhin.</p>
+        <label>Anthropic-API-Key<input type="password" id="apiKey" autocomplete="off" placeholder="sk-ant-…"></label>
+        <label>Modell<input type="text" id="apiModel" placeholder="claude-sonnet-5-5"></label>
+        <label class="check-row"><input type="checkbox" id="autoApply"><span><strong>Empfehlungen automatisch in den Plan übernehmen</strong><small>Sonst erst nach Klick auf „Anpassung in den Plan übernehmen“.</small></span></label>
+        <p class="small">⚠ Datenschutz: Der Key wird nur in diesem Browser gespeichert. Beim Auswerten werden Trainings- und Garmin-Daten direkt an die Anthropic-API gesendet. Verwende nur auf eigenen Geräten und gib den Key nicht weiter.</p>
+        <p><button class="secondary" id="clearKeyBtn">Key entfernen</button></p>
+      </div>
+    </div>
+    <div class="plan-box">
+      <div class="session-head"><div><h3>Aktuelle automatische Anpassungen</h3><p class="small">Zielgewichte/-wiederholungen gelten ab der genannten Woche, bis eine neue Auswertung sie ersetzt.</p></div><button class="danger" id="resetAdaptBtn">Anpassungen zurücksetzen</button></div>
+      <div id="adaptTargets"></div>
+    </div>
+  </section>
+
+  <section class="card rpe-card">
+    <div class="section-kicker">RPE-LEITFADEN</div>
+    <h2>Wie trage ich RPE ein?</h2>
+    <p><strong>RPE = Rate of Perceived Exertion</strong>, also wie anstrengend sich die gesamte Einheit subjektiv angefühlt hat.</p>
+    <div class="rpe-grid">
+      <div><b>1–2</b><span>Sehr leicht · große Reserve</span></div>
+      <div><b>3–4</b><span>Leicht · entspannt</span></div>
+      <div><b>5–6</b><span>Moderat · kontrolliert</span></div>
+      <div><b>7</b><span>Anstrengend · noch Reserve</span></div>
+      <div><b>8</b><span>Sehr anstrengend · wenig Reserve</span></div>
+      <div><b>9–10</b><span>Extrem bis maximal</span></div>
+    </div>
+    <p class="small">RPE wird immer als Gesamturteil über die komplette Einheit eingetragen – inklusive aller Lauf-, Kraft-, Athletik- und Pausenanteile. Bei diesem Wiedereinstieg ist nicht nur RPE wichtig: Schmerzen, Schwellung, Hinken oder eine Verschlechterung am nächsten Tag haben Vorrang vor einer rechnerischen Progression.</p>
+  </section>
+
+  <section class="card extras-card">
+    <div class="section-head"><div><div class="section-kicker">FLEXIBEL</div><h2>Zusatztrainings</h2><p class="small">Neue Einheiten werden der aktuell ausgewählten Woche als eigener Reiter hinzugefügt.</p></div><button class="primary" id="addTrainingBtn">＋ Training hinzufügen</button></div>
+    <div id="extraTrainings"></div>
+  </section>
+
+  <section class="card danger-zone">
+    <div><div class="section-kicker">LOKALE DATEN</div><h2>Tracker zurücksetzen</h2><p class="small">Alle Einträge liegen nur in diesem Browser. Es gibt bewusst keine Import-/Export-Funktion.</p></div>
+    <button class="danger" id="resetBtn">Alle Daten löschen</button>
+  </section>
+</main>
+
+<div class="modal hidden" id="trainingModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal-backdrop" data-close-modal></div>
+  <div class="modal-card">
+    <div class="section-head"><div><div class="section-kicker">NEUE EINHEIT</div><h2 id="modalTitle">Zusatztraining</h2></div><button class="icon-btn" data-close-modal aria-label="Schließen">×</button></div>
+    <form id="trainingForm">
+      <label>Art<select id="extraType"><option>Lauf</option><option>Fahrrad</option><option>Kraft</option><option>Athletik</option><option>Mobility</option><option>Yoga</option><option>Sonstiges</option></select></label>
+      <label>Titel<input id="extraTitle" required placeholder="z. B. lockere Grundlageneinheit"></label>
+      <div class="form-grid"><label>Datum<input id="extraDate" type="date" required></label><label>Dauer (Min.)<input id="extraDuration" type="number" min="1" placeholder="45"></label><label>RPE (1–10)<input id="extraRpe" type="number" min="1" max="10" placeholder="5"></label></div>
+      <label>Ergebnis / Hinweise<textarea id="extraNotes" rows="4" placeholder="Gefühl, Beschwerden, Besonderheiten"></textarea></label>
+      <div class="modal-actions"><button type="button" class="secondary" data-close-modal>Abbrechen</button><button class="primary" type="submit">Speichern</button></div>
+    </form>
+  </div>
+</div>
+
+<noscript><div style="position:fixed;bottom:12px;left:12px;right:12px;padding:12px;background:#fff3cd;border:1px solid #e0b100;border-radius:10px;z-index:9999">JavaScript ist deaktiviert. Der Plan ist sichtbar, aber Speichern und Wechseln der Wochen funktionieren erst mit aktiviertem JavaScript.</div></noscript>
+<script src="./coach.js" defer></script>
+<script src="./app.js" defer></script>
+</body>
+</html>
