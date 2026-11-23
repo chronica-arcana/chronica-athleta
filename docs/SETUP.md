@@ -38,7 +38,7 @@ Kontingente/Modelle ändern sich – bitte beim Anbieter prüfen. Ohne KI-Schlü
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role Key (geheim) |
 | `AI_API_KEY` | KI-Schlüssel |
 | `GARMIN_ENC_KEY` | 32 zufällige Bytes, base64 – erzeugen mit `openssl rand -base64 32` |
-| optional `AI_BASE_URL`, `AI_MODEL`, `AI_DAILY_LIMIT` (Standard 60/Tag/Nutzer) | |
+| optional `AI_BASE_URL`, `AI_MODEL`, `AI_DAILY_LIMIT` (Standard 100/Tag/Nutzer; Wizard, Auswertung und Chat teilen sich das Kontingent) | |
 
 3. `config.js` im Repo ausfüllen (nur **öffentliche** Werte) und pushen:
    ```js
@@ -73,10 +73,12 @@ python tools/garmin_export.py --days 90 --out garmin_data.json
 ```
 Profil → Garmin → „Export-Datei importieren“.
 
+Ist der Personal API Key hinterlegt, synchronisiert die App **automatisch beim Öffnen** (und wenn du zurück in die App wechselst, höchstens alle 20 Minuten). Neue Garmin-Aktivitäten werden als Einheiten übernommen, Schritte, VO₂max, Schlaf, HRV, Ruhepuls und Body Battery fließen in Erholung und Plan ein.
+
 ## Betrieb & Datenschutz
 
 * Jede Tabelle hat Row Level Security – Nutzer sehen/ändern nur eigene Zeilen (`supabase/tests/run-local.sh` prüft das gegen Postgres).
 * Beim Auswerten werden Trainings-/Garmin-Daten an den gewählten KI-Anbieter gesendet; die Prompts liegen serverseitig in `api/ai.js`.
 * Supabase-Free-Projekte können nach längerer Inaktivität pausieren (im Dashboard wieder aktivieren).
-* Konto löschen im Profil entfernt Konto und alle Daten (CASCADE). Export als JSON ebenfalls im Profil.
-* Der alte Fußball-Tracker liegt unter `/legacy/` und nutzt weiter seine lokalen Browserdaten.
+* Konto löschen im Profil entfernt Konto und alle Daten (CASCADE).
+* Der alte Fußball-Tracker liegt weiter unter `/legacy/` (nicht mehr verlinkt, nutzt seine lokalen Browserdaten). Wer ihn nicht mehr braucht, kann den Ordner löschen.

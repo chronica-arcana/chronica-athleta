@@ -150,3 +150,13 @@ pre.diag{margin:0;max-height:240px;overflow:auto;background:var(--sunken);paddin
   h1{font-size:1.9rem}
 }
 hr{border:0;border-top:1px solid var(--line);margin:0;width:100%}
+
+/* Coach-Chat */
+.chat{display:flex;flex-direction:column;gap:14px}
+.msg{display:flex;flex-direction:column;gap:8px}.msg.user{align-items:flex-end}.msg.coach{align-items:flex-start}
+.bubble{max-width:90%;padding:12px 14px;border-radius:16px;line-height:1.5;font-size:.95rem}.bubble p+p{margin-top:8px}
+.bubble.user{background:var(--ink);color:var(--on-ink);border-bottom-right-radius:5px}
+.bubble.coach{background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:5px}.bubble.err{color:var(--bad)}
+.chat-input{position:sticky;bottom:calc(62px + var(--safe-b));display:flex;gap:8px;align-items:flex-end;padding:10px 0;background:linear-gradient(transparent,var(--bg) 24%)}
+.chat-input textarea{min-height:46px;max-height:140px;resize:none}
+@media (min-width:960px){.chat-input{bottom:16px}}

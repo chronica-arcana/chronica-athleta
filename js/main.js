@@ -4,9 +4,10 @@ import {Toasts, Spinner, Icon} from "./ui/common.js";
 import {AuthScreen, RecoveryScreen} from "./ui/auth.js";
 import {Wizard} from "./ui/wizard.js";
 import {Today, Plan, Progress, Profile} from "./ui/views.js";
+import {Chat} from "./ui/chat.js";
 import {SessionSheet, LogSheet, SwapSheet, MoveSheet, AddSheet, AvailabilitySheet} from "./ui/session.js";
 
-const TABS = [["today", "home", "Heute"], ["plan", "calendar", "Plan"], ["progress", "chart", "Fortschritt"], ["profile", "user", "Profil"]];
+const TABS = [["today", "home", "Heute"], ["plan", "calendar", "Plan"], ["progress", "chart", "Fortschritt"], ["coach", "chat", "Coach"], ["profile", "user", "Profil"]];
 
 function App() {
   const [, force] = useReducer(x => x + 1, 0);
@@ -28,6 +29,7 @@ function App() {
     ${tab === "today" && html`<${Today} onOpen=${open} onAdd=${d => setSheet({type: "add", date: d})} onWizard=${() => setWizard(true)} />`}
     ${tab === "plan" && html`<${Plan} onOpen=${open} onAdd=${d => setSheet({type: "add", date: d})} onAvail=${ws => setSheet({type: "avail", ws})} onWizard=${() => setWizard(true)} />`}
     ${tab === "progress" && html`<${Progress} onWizard=${() => setWizard(true)} />`}
+    ${tab === "coach" && html`<${Chat} />`}
     ${tab === "profile" && html`<${Profile} onWizard=${() => setWizard(true)} />`}
     <nav class="tabbar" aria-label="Hauptnavigation"><div class="tabbar-inner"><div class="brand"><small>Chronica</small>Athleta</div>${TABS.map(([k, ic, lb]) => html`<button class=${"tab" + (tab === k ? " active" : "")} aria-current=${tab === k ? "page" : null} onClick=${() => setTab(k)}><${Icon} name=${ic} size=${22} />${lb}</button>`)}</div></nav>
     ${sheet && sheet.type === "session" && sess && html`<${SessionSheet} id=${sheet.id} onClose=${close} />`}

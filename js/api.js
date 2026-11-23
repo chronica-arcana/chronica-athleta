@@ -19,7 +19,7 @@ let aiDown = false;
 export async function ai(task, payload) {
   if (aiDown) throw new Error("KI vorübergehend nicht verfügbar.");
   try { return (await post("/api/ai", {task, payload})).data; }
-  catch (e) { if (e.status === 404 || e.status === 503) aiDown = true; throw e; }
+  catch (e) { if (e.status === 404) aiDown = true; throw e; } // nur wenn die Funktion nicht existiert; 503 (z. B. Anbieter kurz ausgelastet) ist vorübergehend
 }
 export const garmin = {
   connect: apiKey => post("/api/garmin", {action: "connect", apiKey}),

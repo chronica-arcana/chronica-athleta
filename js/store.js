@@ -4,6 +4,8 @@ import {generatePlan, normalizeGoal, defaultTitle, EVENT_PRESETS} from "../engin
 import * as A from "../engine/adapt.js";
 import {recoveryFlags, activityFlags, matchActivities, importSuggestions, normalizeExport} from "../engine/garmin.js";
 import {readiness} from "../engine/readiness.js";
+import {computeStats} from "../engine/stats.js";
+import {sanitizeChat, buildChatContext} from "../engine/chat.js";
 import {applyReadiness, importGarminActivities} from "../engine/auto.js";
 import {kindInfo, SPORTS, PICKABLE_SPORTS} from "../engine/catalog.js";
 import {todayISO, uuid, addDays, weekStart} from "../engine/dates.js";
@@ -213,6 +215,21 @@ export async function autoSync({force = false} = {}) {
   try { await garminApi.sync(last ? 7 : 30); await reloadGarmin(); await afterGarminData(); }
   catch (e) { state.syncError = errText(e); }
   state.syncing = false; emit();
+}
+
+/* ---------- Coach-Chat ---------- */
+export const chatContext = () => buildChatContext({plan: activePlan(), sessions: planSessions(), rd: getReadiness(), stats: computeStats({sessions: state.sessions, garmin: state.garmin, today: today()}), today: today()});
+export async function askCoach(history, question) {
+  const out = await ai("chat", {kontext: chatContext(), verlauf: history.slice(-8).map(m => ({rolle: m.role === "user" ? "Nutzer" : "Coach", text: String(m.text).slice(0, 600)})), frage: String(question).slice(0, 500)});
+  return sanitizeChat(out);
+}
+// Vorgeschlagene Änderung der nächsten Einheit ausführen (erst nach Bestätigung durch den Nutzer)
+export async function applyChatAction(a) {
+  const next = nextSession(); if (!next) throw new Error("Es ist keine kommende Einheit geplant.");
+  if (a.type === "swap") return swap(next.id, a.kind);
+  if (a.type === "skip") return skip(next.id);
+  if (a.type === "scale") return scale(next.id, a.factor);
+  if (a.type === "move_today") return move(next.id, today());
 }
 
 /* ---------- Garmin ---------- */

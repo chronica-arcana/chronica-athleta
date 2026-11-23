@@ -2,7 +2,7 @@
 
 *Flexibler Multisport-Trainingsplaner* – Teil der Chronica-Tools.
 
-Mobil-optimierte Web-App (PWA) für Laufen, Rad, Schwimmen, Kraft, Teamsport, Yoga/Mobility und Wiedereinstieg nach Verletzung.
+Mobil-optimierte Web-App (PWA, am Desktop mit Seitenleiste und zwei Spalten) für Laufen, Rad, Schwimmen, Kraft, Teamsport, Yoga/Mobility und Wiedereinstieg nach Verletzung.
 Ein **Wizard** erfasst dein Ziel (frei formuliert, die KI füllt vor und fragt nach), erstellt einen Plan für den von dir gewählten Zeitraum –
 und der Plan bleibt danach **flexibel**: Einheiten tauschen (z. B. Cardio statt Kraft), verschieben, kürzen, auslassen oder Spontanes eintragen –
 der Rest der Woche rechnet sich automatisch neu.
@@ -11,10 +11,14 @@ der Rest der Woche rechnet sich automatisch neu.
 
 | | |
 |---|---|
-| **Plan-Wizard** | Freitext-Ziel → KI-Vorbelegung + Rückfragen → Event-/Zeitraum, Niveau, Zeitbudget, Ausstattung, Beschwerden → Vorschau mit Phasen & Beispielwoche |
+| **Plan-Wizard** | Freitext-Ziel → die KI füllt aus, was sie erkennt; gefragt wird nur noch, was fehlt → Zusammenfassung zum Bestätigen → Vorschau mit Phasen und erster Einheit. Ohne Freitext/KI der volle Ablauf |
 | **Phasen & Last** | Grundlage → Aufbau → Spezifisch → Tapering (bei Event) bzw. Fundament/Aufbau/Festigung; Entlastungswoche alle 4 Wochen; Wochenlast steigt höchstens ~10 % |
 | **Flexibel** | Tauschen (Kraft ↔ Cardio …), Verschieben, Kürzer/Länger, Auslassen, Hinzufügen, „Woche anpassen“ (nur bestimmte Tage frei). Ausgefallene Kraft wird als 20-Min-Kraft-Snack nachgeholt, verpasste Last höchstens +25 % auf lockere Einheiten verteilt, zu viel Last kürzt den Rest der Woche, keine harten Einheiten hintereinander |
 | **KI-Coach nach dem Training** | Mehr Gewicht / mehr Wiederholungen / halten / reduzieren pro Übung, Hinweise zu Tempo, Pausen, Erholung. Regeln (Double Progression, Schmerz-/RPE-/Garmin-Bremsen) sind immer aktiv; KI-Vorschläge werden darauf begrenzt (max. +10 % Gewicht) |
+| **Coach-Chat** | Fragen zu Training, Erholung und Plan; der Coach kennt nächste und letzte Einheiten, Erholung, Belastung, VO₂max und Kraftziele. Er kann Änderungen an der nächsten Einheit **vorschlagen** (tauschen, auslassen, kürzen/verlängern, heute machen) – ausgeführt wird nur nach deiner Bestätigung |
+| **Yoga/Mobility** | Wird automatisch eingeplant, wenn sinnvoll (Wiedereinstieg/Gesundheit, Entlastungswochen, viel Kraft oder viele Schlüsseleinheiten, bei niedriger Erholung statt Training), mit Ablauf aus Positionen, Dauer und Hinweisen |
+| **Anpassung an Alltag und Erholung** | Garmin-Aktivitäten werden automatisch übernommen (die Woche passt sich an); eigene Trainingsbereitschaft aus Schlaf, HRV, Ruhepuls, Body Battery, Schritten und Belastung passt die heutige Einheit an. Der Fokus liegt auf der nächsten Einheit, Späteres ist vorläufig |
+| **Statistiken und Auszeichnungen** | Summen, Vergleich zum Vormonat, Belastungsverhältnis, Intensitätsverteilung, Kraft-Volumen und Steigerungen, Schritte, Schlaf, Ruhepuls, VO₂max. Auszeichnungen werden nur angezeigt, wenn sie erreicht sind |
 | **Garmin (eigener Account)** | Jeder Nutzer trägt im Profil seinen *eigenen* Garmin **Personal API Key** ein (offizielle API, kein Passwort). Der Key wird geprüft und verschlüsselt gespeichert; die App holt Aktivitäten, Trainingseffekt, Schlaf, HRV, Ruhepuls und Body Battery. Auffällige Erholung bremst Steigerungen; nicht geplante Aktivitäten lassen sich mit einem Tipp übernehmen. **Stand:** gebaut und mit Fake-Garmin getestet, aber noch nicht gegen einen echten Account bestätigt (Diagnose-Button im Profil) |
 | **Konten** | Supabase Auth (E-Mail/Passwort), Daten per Row Level Security strikt je Konto getrennt, Export als JSON, Konto löschen |
 | **Nur kostenlose Dienste** | Supabase Free, Vercel Hobby, KI über kostenlose Anbieter (Groq/Gemini/OpenRouter), keine Bezahl-APIs |
@@ -34,7 +38,7 @@ Browser (statisch, kein Build)                 Vercel (kostenlos)               
 * `api/` – serverlose Funktionen: `ai.js` (KI-Proxy: feste Prompts, Login-Pflicht, Tageslimit) und `garmin.js` (Garmin Personal API: Key prüfen, verschlüsselt speichern, Daten abrufen, Diagnose). `_lib.js`/`_garmin-map.js` = Helfer.
 * `supabase/migrations` – Schema + Zeilenschutz; `supabase/tests` – Prüfung gegen lokales Postgres.
 * `tools/` – Garmin-Export-Skript (Fallback) und archivierte inoffizielle Garmin-Anbindung.
-* `legacy/` – die frühere Fußball-Reha-Version (läuft weiter, eigene lokale Daten).
+* `legacy/` – die frühere Fußball-Reha-Version (nicht mehr verlinkt, eigene lokale Daten).
 
 ## Schnellstart
 
