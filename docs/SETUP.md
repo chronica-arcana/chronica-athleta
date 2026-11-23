@@ -44,6 +44,8 @@ Kontingente/Modelle ändern sich – bitte beim Anbieter prüfen. Ohne KI-Schlü
    ```bash
    python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
    ```
+   Ohne Python geht auch (gleiches Format): `openssl rand -base64 32 | tr '+/' '-_'`
+   Das Deployment funktioniert auch ohne diese Variable; die Garmin-Funktion meldet dann „Server nicht konfiguriert“, bis sie gesetzt ist.
    **Sichere `GARMIN_ENC_KEY`!** Geht er verloren, müssen alle Nutzer Garmin neu verbinden.
 3. `config.js` im Repo ausfüllen (nur **öffentliche** Werte) und pushen:
    ```js

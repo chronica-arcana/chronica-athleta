@@ -84,4 +84,20 @@ class T(unittest.TestCase):
         self.call({"action": "connect", "email": "a@b.de", "password": "x"})
         self.assertEqual(self.call({"action": "disconnect"}), (200, {"ok": True})); self.assertIsNone(self.sb.link)
 
+class WSGI(unittest.TestCase):
+    def call(self, method="POST", body=b"{}", auth=""):
+        from io import BytesIO
+        out = {}
+        env = {"REQUEST_METHOD": method, "CONTENT_LENGTH": str(len(body)), "wsgi.input": BytesIO(body), "HTTP_AUTHORIZATION": auth}
+        res = G.app(env, lambda status, headers: out.update(status=status, headers=dict(headers)))
+        return out["status"], json.loads(b"".join(res)), out["headers"]
+
+    def test_wsgi_entrypoint(self):
+        self.assertEqual(self.call("GET")[0], "405 Method Not Allowed")
+        self.assertEqual(self.call(body=b"nope")[0], "400 Bad Request")
+        self.assertEqual(self.call(body=b"x" * 20000)[0], "413 Content Too Large" if hasattr(__import__("http").HTTPStatus, "CONTENT_TOO_LARGE") else "413 Request Entity Too Large")
+        st, out, h = self.call(body=json.dumps({"action": "evil"}).encode())
+        self.assertEqual((st, out["error"], h["cache-control"]), ("400 Bad Request", "Unbekannte Aktion.", "no-store"))
+        self.assertTrue(callable(G.handler) and callable(G.app))
+
 if __name__ == "__main__": unittest.main()

@@ -22,6 +22,7 @@ import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
+from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 
 MIN_SYNC_SECONDS = 120
@@ -275,7 +276,33 @@ def handle(body, token, sb=None, fernet=None, Garmin=None):
         return 500, {"error": "Interner Fehler."}
 
 
+def _token_from(auth):
+    return auth[7:].strip() if auth.startswith("Bearer ") else ""
+
+
+def app(environ, start_response):
+    """WSGI-Einstiegspunkt (neuere Vercel-Python-Laufzeit erwartet eine Variable `app`)."""
+    def respond(status, body):
+        raw = json.dumps(body).encode()
+        start_response(f"{status} {HTTPStatus(status).phrase}", [("content-type", "application/json; charset=utf-8"), ("cache-control", "no-store"), ("content-length", str(len(raw)))])
+        return [raw]
+
+    if environ.get("REQUEST_METHOD") != "POST":
+        return respond(405, {"error": "Nur POST."})
+    try:
+        length = int(environ.get("CONTENT_LENGTH") or 0)
+        if length > 10000:
+            return respond(413, {"error": "Anfrage zu groß."})
+        body = json.loads(environ["wsgi.input"].read(length) or b"{}")
+    except Exception:
+        return respond(400, {"error": "Ungültige Anfrage."})
+    status, out = handle(body, _token_from(environ.get("HTTP_AUTHORIZATION", "")))
+    return respond(status, out)
+
+
 class handler(BaseHTTPRequestHandler):
+    """Klassischer Einstiegspunkt (ältere Vercel-Python-Laufzeit)."""
+
     def _send(self, status, body):
         raw = json.dumps(body).encode()
         self.send_response(status)
@@ -293,8 +320,7 @@ class handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length) or b"{}")
         except Exception:
             return self._send(400, {"error": "Ungültige Anfrage."})
-        auth = self.headers.get("authorization", "")
-        status, out = handle(body, auth[7:].strip() if auth.startswith("Bearer ") else "")
+        status, out = handle(body, _token_from(self.headers.get("authorization", "")))
         self._send(status, out)
 
     def do_GET(self):
