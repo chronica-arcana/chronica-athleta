@@ -23,12 +23,12 @@ test("AI-Handler: Auth, Limit, Aufgabenprüfung, Modellaufruf", async () => {
   const sb = await server((q, r) => {
     let b = ""; q.on("data", c => b += c); q.on("end", () => {
       if (q.url === "/auth/v1/user") { if (q.headers.authorization === "Bearer good") { r.setHeader("content-type", "application/json"); r.end(JSON.stringify({id: "u1"})); } else { r.statusCode = 401; r.end("{}"); } }
-      else if (q.url === "/rest/v1/rpc/ai_hit") { seen.hits++; r.setHeader("content-type", "application/json"); r.end(String(seen.hits)); }
+      else if (q.url === "/rest/v1/rpc/ai_hit") { if (!b.includes("00000000-0000-0000-0000-000000000000")) seen.hits++; r.setHeader("content-type", "application/json"); r.end(String(seen.hits)); }
       else { r.statusCode = 404; r.end(); }
     });
   });
   const llm = await server((q, r) => {
-    let b = ""; q.on("data", c => b += c); q.on("end", () => { const j = JSON.parse(b); seen.model = j.model; seen.auth = q.headers.authorization; seen.msg = j.messages;
+    let b = ""; q.on("data", c => b += c); q.on("end", () => { if (q.method === "GET") { r.setHeader("content-type", "application/json"); return r.end("{}"); } const j = JSON.parse(b); seen.model = j.model; seen.auth = q.headers.authorization; seen.msg = j.messages;
       r.setHeader("content-type", "application/json"); r.end(JSON.stringify({choices: [{message: {content: '{"title":"Halbmarathon-Plan","summary":"Los!","tips":[]}'}}]})); });
   });
   const env = {SUPABASE_URL: `http://127.0.0.1:${sb.address().port}`, SUPABASE_ANON_KEY: "anon", SUPABASE_SERVICE_ROLE_KEY: "svc", AI_API_KEY: "k", AI_BASE_URL: `http://127.0.0.1:${llm.address().port}/v1`, AI_MODEL: "m", AI_DAILY_LIMIT: "2"};
