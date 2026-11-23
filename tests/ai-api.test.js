@@ -4,8 +4,8 @@ import http from "node:http";
 import handler, {extractJson, TASKS} from "../api/ai.js";
 
 function server(fn) { return new Promise(r => { const s = http.createServer(fn); s.listen(0, () => r(s)); }); }
-const call = async (env, {method = "POST", headers = {}, body} = {}) => {
-  const req = {method, headers, body}; let out = {headers: {}};
+const call = async (env, {method = "POST", headers = {}, body, url = "/api/ai"} = {}) => {
+  const req = {method, headers, body, url}; let out = {headers: {}};
   const res = {statusCode: 200, setHeader: (k, v) => { out.headers[k] = v; }, end: s => { out.body = s ? JSON.parse(s) : null; out.status = res.statusCode; }};
   await handler(req, res, env); return out;
 };
@@ -38,6 +38,12 @@ test("AI-Handler: Auth, Limit, Aufgabenprüfung, Modellaufruf", async () => {
     assert.ok(!JSON.stringify(health.body).includes("svc") && !JSON.stringify(health.body).includes('"k"'), "keine Geheimnisse im Healthcheck");
     const bare = await call({}, {method: "GET"}); assert.deepEqual([bare.body.aiKey, bare.body.supabaseUrl, bare.body.serviceRoleKey], [false, false, false]);
     assert.equal((await call(env, {method: "PUT"})).status, 405);
+    const deep = await call({...env}, {method: "GET", url: "/api/ai?check=1"});
+    assert.equal(deep.status, 200); assert.equal(deep.body.live.supabaseAuth.error, undefined);
+    assert.equal(deep.body.live.aiHitFunction.exists, true); assert.ok(deep.body.live.aiProvider);
+    assert.ok(!JSON.stringify(deep.body).includes("svc"), "keine Geheimnisse im Live-Check");
+    const noFn = await call({...env, SUPABASE_URL: `http://127.0.0.1:${sb.address().port}/missing`}, {method: "GET", url: "/api/ai?check=1"});
+    assert.equal(noFn.body.live.aiHitFunction.exists, false, "404 => SQL fehlt");
     assert.equal((await call(env, {body: {task: "plan_summary", payload: {}}})).status, 401, "ohne Login abgelehnt");
     assert.equal((await call(env, {headers: {authorization: "Bearer bad"}, body: {task: "plan_summary"}})).status, 401);
     assert.equal((await call(env, {headers: {authorization: "Bearer good"}, body: {task: "beliebiger_prompt", payload: {}}})).status, 400);

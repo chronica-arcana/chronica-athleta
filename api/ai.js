@@ -88,11 +88,27 @@ export async function callModel(task, payload, env = process.env) {
   const e = new Error("KI-Antwort war nicht verwertbar."); e.status = 502; throw e;
 }
 
+// Prüft live, ob Supabase, die Datenbankfunktion ai_hit und der KI-Anbieter erreichbar/gültig sind (nur Statuscodes).
+export async function liveCheck(env = process.env) {
+  const probe = async (fn) => { try { return await fn(); } catch (e) { return {error: e.name === "AbortError" ? "timeout" : "nicht erreichbar"}; } };
+  const live = {};
+  live.supabaseAuth = env.SUPABASE_URL && env.SUPABASE_ANON_KEY ? await probe(async () => { const r = await timedFetch(`${env.SUPABASE_URL}/auth/v1/settings`, {headers: {apikey: env.SUPABASE_ANON_KEY}}, 8000); return {status: r.status, ok: r.ok}; }) : {error: "Variable fehlt"};
+  live.aiHitFunction = env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY ? await probe(async () => {
+    // Dummy-Nutzer: schlägt am Fremdschlüssel fehl, wenn die Funktion existiert (409/400); 404 = SQL-Migration nicht ausgeführt; 401/403 = falscher Service-Key
+    const r = await timedFetch(`${env.SUPABASE_URL}/rest/v1/rpc/ai_hit`, {method: "POST", headers: {"content-type": "application/json", apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`}, body: JSON.stringify({p_user: "00000000-0000-0000-0000-000000000000", p_limit: 1})}, 8000);
+    return {status: r.status, exists: r.status !== 404, keyAccepted: r.status !== 401 && r.status !== 403};
+  }) : {error: "Variable fehlt"};
+  live.aiProvider = env.AI_API_KEY ? await probe(async () => { const base = (env.AI_BASE_URL || "https://api.groq.com/openai/v1").replace(/\/$/, ""); const r = await timedFetch(`${base}/models`, {headers: {authorization: `Bearer ${env.AI_API_KEY}`}}, 8000); return {status: r.status, keyAccepted: r.ok}; }) : {error: "Variable fehlt"};
+  return live;
+}
+
 export default async function handler(req, res, env = process.env) {
   res.setHeader("x-content-type-options", "nosniff");
   if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
-  if (req.method === "GET") { // Gesundheitscheck für die Einrichtung: nur ja/nein, keine Werte
-    return json(res, 200, {ok: true, function: "ai", aiKey: !!env.AI_API_KEY, supabaseUrl: !!env.SUPABASE_URL, supabaseAnonKey: !!env.SUPABASE_ANON_KEY, serviceRoleKey: !!env.SUPABASE_SERVICE_ROLE_KEY, model: env.AI_MODEL || "llama-3.3-70b-versatile"});
+  if (req.method === "GET") { // Gesundheitscheck für die Einrichtung: nur ja/nein bzw. Statuscodes, keine Werte
+    const out = {ok: true, function: "ai", aiKey: !!env.AI_API_KEY, supabaseUrl: !!env.SUPABASE_URL, supabaseAnonKey: !!env.SUPABASE_ANON_KEY, serviceRoleKey: !!env.SUPABASE_SERVICE_ROLE_KEY, model: env.AI_MODEL || "llama-3.3-70b-versatile"};
+    if (String(req.url || "").includes("check=1")) out.live = await liveCheck(env);
+    return json(res, 200, out);
   }
   if (req.method !== "POST") return json(res, 405, {error: "Nur POST."});
   if (!env.AI_API_KEY) return json(res, 503, {error: "KI ist auf dem Server nicht konfiguriert."});
