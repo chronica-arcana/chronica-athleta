@@ -43,7 +43,6 @@ Browser (statisch, kein Build)                 Vercel (kostenlos)               
 * `api/` – serverlose Funktionen: `ai.js` (KI-Proxy: feste Prompts, Login-Pflicht, Tageslimit) und `garmin.js` (Garmin Personal API: Key prüfen, verschlüsselt speichern, Daten abrufen, Diagnose). `_lib.js`/`_garmin-map.js` = Helfer.
 * `supabase/migrations` – Schema + Zeilenschutz; `supabase/tests` – Prüfung gegen lokales Postgres.
 * `tools/` – Garmin-Export-Skript (Fallback) und archivierte inoffizielle Garmin-Anbindung.
-* `legacy/` – die frühere Fußball-Reha-Version (nicht mehr verlinkt, eigene lokale Daten).
 
 ## Schnellstart
 

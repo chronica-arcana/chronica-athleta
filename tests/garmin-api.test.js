@@ -26,6 +26,7 @@ async function setup() {
     if (flags.denyData || q.headers.authorization !== `Bearer ${TOKEN}`) { r.statusCode = 401; return r.end("{}"); }
     if (p === "/activitylist-service/activities/search/activities") return r.end(JSON.stringify([{activityId: 11, activityName: "Morgenlauf-GEHEIM", startTimeLocal: `${yesterday} 07:30:00`, activityType: {typeKey: "running"}, duration: 2700, distance: 8000, averageHR: 150, aerobicTrainingEffect: 3.1, activityTrainingLoad: 120}, {kaputt: true}]));
     if (p.startsWith("/hrv-service/hrv/daily/")) return r.end(JSON.stringify({hrvSummaries: [{calendarDate: yesterday, lastNightAvg: 55, status: "balanced"}]}));
+    if (p.startsWith("/usersummary-service/stats/stress/daily/")) return r.end(JSON.stringify([{calendarDate: yesterday, values: {overallStressLevel: 47.4}}]));
     if (p.startsWith("/usersummary-service/stats/steps/daily/")) return r.end(JSON.stringify([{calendarDate: yesterday, totalSteps: 11234, stepGoal: 10000}]));
     if (p.startsWith("/metrics-service/metrics/maxmet/daily/")) return r.end(JSON.stringify([{generic: {calendarDate: yesterday, vo2MaxPreciseValue: 51.74}, cycling: {vo2MaxValue: 49}}]));
     if (p === "/wellness-service/wellness/bodyBattery/reports/daily") return r.end(JSON.stringify([{date: yesterday, bodyBatteryValuesArray: [[1, 40], [2, 80], [3, 70], [4, 30], [5, 20], [6, 10]]}]));
@@ -96,6 +97,7 @@ test("Garmin-Funktion: Login-Pflicht, Key-Prüfung, verschlüsselte Ablage, nie 
     const dy = s.log.upserts.garmin_daily.find(d => d.date === s.yesterday);
     assert.deepEqual([dy.user_id, dy.data.sleepHours, dy.data.sleepScore, dy.data.restingHr, dy.data.hrvAvg, dy.data.hrvStatus, dy.data.bodyBatteryMorning], ["u1", 7.5, 80, 51, 55, "BALANCED", 80]);
     assert.deepEqual([dy.data.steps, dy.data.vo2max, dy.data.vo2maxCycling], [11234, 51.7, 49], "Schritte und VO2max kommen in den Tageswerten an");
+    assert.equal(dy.data.stressAvg, 47, "Stress kommt in den Tageswerten an");
     assert.ok(s.log.upserts.garmin_daily.every(d => d.user_id === "u1") && s.log.upserts.garmin_activities.every(a => a.user_id === "u1"));
     assert.equal(s.rows.get("u1").last_error, null); assert.ok(s.rows.get("u1").last_sync_at);
     assert.deepEqual(sync.body.report.sleep, {ok: 4, failed: 0, items: 4, lastStatus: 200});

@@ -58,3 +58,10 @@ test("Auszeichnungen: Zeit, Distanz (Garmin), Vielfalt, Kraft, Alltag, Schlaf, V
   assert.equal(ids.get("steps10k").date, "2026-10-13"); assert.equal(ids.get("steps20k").date, "2026-10-13"); assert.equal(ids.get("sleep7").date, "2026-10-16"); assert.equal(ids.get("vo2pb").date, "2026-10-17", "neuer Bestwert nach genug Messwerten");
   assert.equal(ids.get("weekgoal1").date, "2026-10-04", "Woche vom 28.9. erreicht"); assert.ok(!ids.has("weekgoal4"));
 });
+
+import {readiness as _rd} from "../engine/readiness.js";
+test("Stress am Vortag senkt die Bereitschaft", () => {
+  const mk = st => [{date: "2026-11-22", stressAvg: st, steps: 5000}, {date: "2026-11-23", sleepHours: 7.5, restingHr: 50, hrvStatus: "BALANCED"}];
+  const hi = _rd(mk(65), "2026-11-23"), lo = _rd(mk(20), "2026-11-23");
+  assert.ok(hi.score < lo.score); assert.ok(hi.factors.some(f => /Stress/.test(f.text))); assert.equal(hi.stress, 65);
+});

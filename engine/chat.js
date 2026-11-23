@@ -38,7 +38,7 @@ export function buildChatContext({plan, sessions, rd, stats, today}) {
   return {heute: today,
     plan: plan ? {titel: plan.title, modus: g.mode, niveau: g.level, sportarten: g.sports, event: g.event && g.event.preset, eventdatum: g.event && g.event.date, tageProWoche: g.daysPerWeek, beschwerden: !!g.injury, phasen: (plan.meta.phases || []).map(p => p.name)} : null,
     naechsteEinheiten: planned, letzteEinheiten: done,
-    erholung: rd ? {score: rd.score, stufe: rd.level, hinweise: rd.factors.map(f => f.text), schritte: rd.steps, vo2max: rd.vo2max} : null,
+    erholung: rd ? {score: rd.score, stufe: rd.level, hinweise: rd.factors.map(f => f.text), schritte: rd.steps, stressGestern: rd.stress, vo2max: rd.vo2max} : null,
     belastung: stats && stats.workload && stats.workload.ratio != null ? {verhaeltnis7zu28: stats.workload.ratio, stufe: stats.workload.level} : null,
     artenImPlan: (() => { const m = new Map(); sessions.filter(x => x.status === "planned" && x.date >= today).forEach(x => { const e = m.get(x.kind) || {art: x.kind, bezeichnung: (KINDS[x.kind] || {}).label || x.kind, anzahl: 0, bis: x.date}; e.anzahl++; e.bis = x.date; m.set(x.kind, e); }); return [...m.values()].slice(0, 10); })(),
     regeln: plan ? (plan.meta.rules || []).map(r => ({arten: r.kinds, sportarten: r.sports, bis: r.until, ersatz: r.replaceWith})) : [],

@@ -52,6 +52,11 @@ export function mapSteps(item) {
   const date = day(first(item || {}, "calendarDate", "date")), steps = num(first(item || {}, "totalSteps", "steps", "stepCount"));
   return date && steps != null ? {date, steps: Math.round(steps)} : null;
 }
+// Stress: Tagesdurchschnitt (0–100); Garmin liefert je Tag ein Objekt, ggf. mit "values"
+export function mapStress(item) {
+  const date = day(first(item || {}, "calendarDate", "date")), v = num(first(item || {}, "values.overallStressLevel", "overallStressLevel", "avgStressLevel", "averageStressLevel", "stressAvg"));
+  return date && v != null && v >= 0 ? {date, stressAvg: Math.round(v)} : null;
+}
 // VO2max: Garmin liefert je Tag Werte für "generic" (Laufen) und "cycling"
 export function mapVo2(item) {
   const g = first(item || {}, "generic") || item || {}, c = first(item || {}, "cycling") || {};

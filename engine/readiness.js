@@ -41,6 +41,7 @@ export function readiness(daily, date, {activities = [], sessions = []} = {}) {
   if (base != null && d.restingHr != null) { const dl = d.restingHr - base; if (dl >= 7) add(-20, "Ruhepuls deutlich erhöht"); else if (dl >= 4) add(-10, "Ruhepuls erhöht"); else if (dl <= -2) add(3, "Ruhepuls niedrig"); }
   if (d.bodyBatteryMorning != null) { if (d.bodyBatteryMorning < 25) add(-20, "Body Battery sehr niedrig"); else if (d.bodyBatteryMorning < 40) add(-10, "Body Battery niedrig"); else if (d.bodyBatteryMorning >= 70) add(8, "Body Battery hoch"); }
   const y = daily.find(x => x.date === addDays(date, -1)); if (y && y.steps != null) { if (y.steps >= 20000) add(-8, "sehr viele Schritte gestern"); else if (y.steps >= 15000) add(-4, "viele Schritte gestern"); }
+  if (y && y.stressAvg != null) { if (y.stressAvg >= 60) add(-10, "sehr hoher Stress gestern"); else if (y.stressAvg >= 45) add(-5, "erhöhter Stress gestern"); else if (y.stressAvg <= 25) add(2, "wenig Stress gestern"); }
   const yl = dayLoad(addDays(date, -1), sessions, activities), w = workload(sessions, activities, addDays(date, -1));
   if (w.weekly >= 60 && yl > 1.8 * (w.weekly / 7) && yl > 90) add(-10, "hohe Belastung gestern");
   if (w.level === "high") add(-8, "hohe Wochenbelastung");
@@ -48,5 +49,5 @@ export function readiness(daily, date, {activities = [], sessions = []} = {}) {
   const level = score >= 65 ? "high" : score >= 45 ? "medium" : "low";
   const recommendation = level === "high" ? "train" : level === "medium" ? "easy" : "rest";
   const text = level === "high" ? "Gut erholt: Training wie geplant." : level === "medium" ? "Mäßig erholt: Umfang etwas reduzieren, keine zusätzliche Intensität." : "Wenig erholt: heute Ruhetag oder Yoga/Mobility statt Training.";
-  return {score, level, recommendation, text, factors, workload: w, steps: d.steps ?? null, vo2max: d.vo2max ?? null};
+  return {score, level, recommendation, text, factors, workload: w, steps: d.steps ?? null, stress: y && y.stressAvg != null ? y.stressAvg : null, vo2max: d.vo2max ?? null};
 }

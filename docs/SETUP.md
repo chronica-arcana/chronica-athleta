@@ -81,4 +81,3 @@ Ist der Personal API Key hinterlegt, synchronisiert die App **automatisch beim �
 * Beim Auswerten werden Trainings-/Garmin-Daten an den gewählten KI-Anbieter gesendet; die Prompts liegen serverseitig in `api/ai.js`.
 * Supabase-Free-Projekte können nach längerer Inaktivität pausieren (im Dashboard wieder aktivieren).
 * Konto löschen im Profil entfernt Konto und alle Daten (CASCADE).
-* Der alte Fußball-Tracker liegt weiter unter `/legacy/` (nicht mehr verlinkt, nutzt seine lokalen Browserdaten). Wer ihn nicht mehr braucht, kann den Ordner löschen.
