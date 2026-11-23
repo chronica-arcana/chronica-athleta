@@ -1,7 +1,7 @@
 {
-  "name": "Flexibler Trainingsplan",
-  "short_name": "Training",
-  "description": "Multisport-Trainingsplaner mit KI-Coach und Garmin",
+  "name": "Chronica Athleta",
+  "short_name": "Athleta",
+  "description": "Chronica Athleta – flexibler Multisport-Trainingsplaner mit KI-Coach und Garmin",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
