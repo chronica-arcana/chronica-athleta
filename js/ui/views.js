@@ -129,7 +129,7 @@ function GarminCard() {
   const connect = run(async () => { await S.garminApi.connect(key.trim()); setKey(""); await S.refreshLink(); setMsg("✓ Key geprüft und verschlüsselt gespeichert."); });
   const sync = run(async () => { const r = await S.garminApi.sync(30); await S.reloadGarmin(); const bad = Object.entries(r.report || {}).filter(([, v]) => v.ok === 0 && v.failed > 0).map(([k, v]) => `${k} (HTTP ${v.lastStatus})`); setMsg(`✓ ${r.activities} Aktivitäten, ${r.daily} Tageswerte synchronisiert.${bad.length ? " Nicht abrufbar: " + bad.join(", ") + " – siehe Diagnose." : ""}`); });
   const [diag, setDiag] = useState("");
-  const runDiag = run(async () => { const r = await S.garminApi.diagnose(); setDiag(JSON.stringify(r.endpoints, null, 1)); });
+  const runDiag = run(async () => { const r = await S.garminApi.diagnose(); setDiag(JSON.stringify(r, null, 1)); });
   const disc = run(async () => { await S.garminApi.disconnect(); await S.refreshLink(); S.toast("Garmin getrennt, Key gelöscht.", "info"); });
   const onFile = async e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (!f) return; setBusy(true); setMsg(""); try { const r = await S.importGarminFile(await f.text()); setMsg(`✓ ${r.activities} Aktivitäten, ${r.daily} Tageswerte importiert.`); } catch (err) { setMsg("⚠ " + err.message); } setBusy(false); };
   return html`<div class="card stack"><div class="row"><span style="font-size:1.6rem">⌚</span><div class="grow"><h3>Garmin Connect</h3><div class="small muted">Aktivitäten, Schlaf, HRV, Ruhepuls & Body Battery bremsen oder erlauben Steigerungen.</div></div></div>

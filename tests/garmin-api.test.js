@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import crypto from "node:crypto";
 import handler, {encrypt, decrypt, TOKEN_URL} from "../api/garmin.js";
+import {extractAccessToken} from "../api/garmin.js";
 import {mapActivity, mapSleep, mapHrv, mapRestingHr, mapBodyBattery, mergeDaily, shapeOf, asList} from "../api/_garmin-map.js";
 
 const server = fn => new Promise(r => { const s = http.createServer(fn); s.listen(0, () => r(s)); });
@@ -10,18 +11,19 @@ const call = async (env, {method = "POST", headers = {authorization: "Bearer goo
   const out = {}, res = {statusCode: 200, setHeader() {}, end: s => { out.body = JSON.parse(s); out.status = res.statusCode; }};
   await handler({method, headers, body}, res, env); return out;
 };
+const TOKEN = "TOKEN-SECRET-0123456789ABCDEF";
 const KEY = crypto.randomBytes(32).toString("base64"), USER_KEY = "pk_live_ABCDEF1234567890SECRET";
 
 async function setup() {
   const rows = new Map(), log = {tokenCalls: [], saved: [], dataCalls: [], upserts: {garmin_activities: [], garmin_daily: []}};
-  const flags = {failSleep: false, denyData: false}, yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+  const flags = {failSleep: false, denyData: false, tokenFormat: "snake"}, yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
   const garmin = await server((q, r) => { const u = new URL(q.url, "http://x"), p = u.pathname; log.tokenCalls.push({url: q.url, auth: q.headers.authorization, method: q.method}); r.setHeader("content-type", "application/json");
     if (p === "/token") {
-      if (q.headers.authorization === `ApiKey ${USER_KEY}`) return r.end('{"access_token":"TOKEN-SECRET","expires_in":86400}');
+      if (q.headers.authorization === `ApiKey ${USER_KEY}`) { const f = flags.tokenFormat; if (f === "camel") return r.end(JSON.stringify({accessToken: TOKEN})); if (f === "nested") return r.end(JSON.stringify({data: {tokenValue: TOKEN, expires: 1}})); if (f === "text") { r.setHeader("content-type", "text/plain"); return r.end(TOKEN); } if (f === "unknown") return r.end(JSON.stringify({foo: "bar", n: 1})); return r.end(JSON.stringify({access_token: TOKEN, expires_in: 86400})); }
       r.statusCode = q.headers.authorization === "ApiKey expired" ? 403 : 401; return r.end("{}");
     }
     log.dataCalls.push({path: p, query: Object.fromEntries(u.searchParams), auth: q.headers.authorization});
-    if (flags.denyData || q.headers.authorization !== "Bearer TOKEN-SECRET") { r.statusCode = 401; return r.end("{}"); }
+    if (flags.denyData || q.headers.authorization !== `Bearer ${TOKEN}`) { r.statusCode = 401; return r.end("{}"); }
     if (p === "/activitylist-service/activities/search/activities") return r.end(JSON.stringify([{activityId: 11, activityName: "Morgenlauf-GEHEIM", startTimeLocal: `${yesterday} 07:30:00`, activityType: {typeKey: "running"}, duration: 2700, distance: 8000, averageHR: 150, aerobicTrainingEffect: 3.1, activityTrainingLoad: 120}, {kaputt: true}]));
     if (p.startsWith("/hrv-service/hrv/daily/")) return r.end(JSON.stringify({hrvSummaries: [{calendarDate: yesterday, lastNightAvg: 55, status: "balanced"}]}));
     if (p === "/wellness-service/wellness/bodyBattery/reports/daily") return r.end(JSON.stringify([{date: yesterday, bodyBatteryValuesArray: [[1, 40], [2, 80], [3, 70], [4, 30], [5, 20], [6, 10]]}]));
@@ -86,7 +88,7 @@ test("Garmin-Funktion: Login-Pflicht, Key-Prüfung, verschlüsselte Ablage, nie 
     const sync = await call(s.env, {body: {action: "sync", days: 3}});
     assert.equal(sync.status, 200); assert.equal(sync.body.activities, 1, "ungültige Aktivität wird verworfen");
     assert.equal(sync.body.daily, 4, "4 Tage mit Schlaf+Puls"); assert.ok(!JSON.stringify(sync.body).includes("TOKEN-SECRET"));
-    assert.ok(s.log.dataCalls.every(c => c.auth === "Bearer TOKEN-SECRET"), "Daten nur mit Access-Token, nie mit dem API-Key");
+    assert.ok(s.log.dataCalls.every(c => c.auth === `Bearer ${TOKEN}`), "Daten nur mit Access-Token, nie mit dem API-Key");
     const act = s.log.upserts.garmin_activities[0];
     assert.deepEqual([act.user_id, act.id, act.date, act.data.type, act.data.durationMin, act.data.distanceKm, act.data.avgHr, act.data.aerobicTE, act.data.trainingLoad], ["u1", "11", s.yesterday, "running", 45, 8, 150, 3.1, 120]);
     const dy = s.log.upserts.garmin_daily.find(d => d.date === s.yesterday);
@@ -140,4 +142,37 @@ test("Mapper liest tolerant (alternative Feldnamen) und verwirft unbrauchbare Ei
   assert.deepEqual(asList({hrvSummaries: [1, 2]}), [1, 2]); assert.deepEqual(asList(null), []);
   assert.deepEqual(mergeDaily([[{date: "2026-11-20", restingHr: 50}], [{date: "2026-11-20", sleepHours: 7, hrvAvg: null}], null, [{date: "2026-11-19", sleepHours: 5}]]).map(d => [d.date, d.restingHr, d.sleepHours, "hrvAvg" in d]), [["2026-11-19", undefined, 5, false], ["2026-11-20", 50, 7, false]]);
   assert.deepEqual(shapeOf({a: "text", b: [{c: 1, d: null}], e: {f: true}}), {a: "string", b: [{c: "number", d: "null"}], e: {f: "boolean"}});
+});
+
+test("Access-Token wird aus verschiedenen Antwortformaten gelesen", () => {
+  const T = TOKEN, J = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl";
+  const get = (json, text = "") => extractAccessToken({json, text});
+  assert.equal(get({access_token: T}), T); assert.equal(get({accessToken: T}), T); assert.equal(get({token: T}), T);
+  assert.equal(get({data: {result: {tokenValue: T}}}), T, "verschachtelt");
+  assert.equal(get({irgendwas: J}), J, "JWT unter beliebigem Namen");
+  assert.equal(get({refresh_token: "r".repeat(40), access_token: T}), T, "Refresh-Token wird nicht verwechselt");
+  assert.equal(get(null, T), T, "reiner Text"); assert.equal(get(null, `"${T}"`), T, "Text in Anführungszeichen"); assert.equal(get(null, `Bearer ${T}`), T);
+  assert.equal(get(T), T, "JSON-String");
+  assert.equal(get({foo: "bar", n: 1}), null); assert.equal(get(null, ""), null); assert.equal(get(null, "Fehler aufgetreten bitte später"), null); assert.equal(get({token: "kurz"}), null);
+});
+
+test("Garmin-Sync mit verschiedenen Token-Formaten und bei unbekanntem Format mit Diagnose statt Raten", async () => {
+  const s = await setup();
+  try {
+    assert.equal((await call(s.env, {body: {action: "connect", apiKey: USER_KEY}})).status, 200);
+    for (const fmt of ["camel", "nested", "text"]) {
+      s.flags.tokenFormat = fmt; const r = await call(s.env, {body: {action: "sync", days: 1}});
+      assert.equal(r.status, 200, `Format ${fmt}`); assert.equal(r.body.activities, 1);
+    }
+    s.flags.tokenFormat = "unknown";
+    const bad = await call(s.env, {body: {action: "sync", days: 1}});
+    assert.equal(bad.status, 502); assert.match(bad.body.error, /Unerwartete Antwort des Garmin-Token-Endpunkts \(HTTP 200, .*Felder: foo, n\)/);
+    assert.ok(!JSON.stringify(bad.body).includes("bar"), "keine Werte in der Fehlermeldung");
+    const dg = await call(s.env, {body: {action: "diagnose"}});
+    assert.equal(dg.status, 200); assert.equal(dg.body.endpoints, null); assert.equal(dg.body.tokenResponse.tokenFound, false);
+    assert.deepEqual(dg.body.tokenResponse.shape, {foo: "string", n: "number"}); assert.ok(!JSON.stringify(dg.body).includes("bar"));
+    s.flags.tokenFormat = "snake";
+    const ok = await call(s.env, {body: {action: "diagnose"}});
+    assert.equal(ok.body.tokenResponse.tokenFound, true); assert.ok(ok.body.endpoints.activities); assert.ok(!JSON.stringify(ok.body).includes(TOKEN));
+  } finally { s.close(); }
 });

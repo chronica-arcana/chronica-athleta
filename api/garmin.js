@@ -60,7 +60,8 @@ function db(env) {
 }
 
 /* ---------- Garmin ---------- */
-// Tauscht den Personal-API-Key gegen ein Access-Token. Liefert nie Key oder Token nach außen.
+// Tauscht den Personal-API-Key gegen ein Access-Token. Liefert die Rohantwort {status, contentType, text, json};
+// Key und Token verlassen den Server nie.
 export async function exchangeToken(apiKey, env = process.env) {
   let r;
   try { r = await timedFetch(env.GARMIN_TOKEN_URL || TOKEN_URL, {method: "POST", headers: {authorization: `ApiKey ${apiKey}`}}, 15000); }
@@ -68,12 +69,33 @@ export async function exchangeToken(apiKey, env = process.env) {
   if (r.status === 401 || r.status === 403) throw new ApiError(401, "Der Key wurde von Garmin abgelehnt (ungültig, abgelaufen oder widerrufen).");
   if (r.status === 429) throw new ApiError(429, "Garmin-Limit erreicht, bitte später erneut versuchen.");
   if (!r.ok) throw new ApiError(502, `Garmin hat den Key-Austausch abgelehnt (HTTP ${r.status}).`);
-  let body = null; try { body = await r.json(); } catch {}
-  return body; // Format laut Doku noch nicht bekannt: wird in fetchPersonalData ausgewertet
+  let text = ""; try { text = await r.text(); } catch {}
+  let parsed = null; try { parsed = JSON.parse(text); } catch {}
+  return {status: r.status, contentType: (r.headers && r.headers.get && r.headers.get("content-type")) || "", text, json: parsed};
 }
 
+// Access-Token aus der Antwort lesen: Format laut Doku nicht beschrieben -> tolerant (JSON mit access_token/accessToken/token,
+// verschachtelt, JWT irgendwo, oder reiner Text).
+const JWT = /^eyJ[\w-]+\.[\w-]+\.[\w-]*$/;
+export function extractAccessToken(res) {
+  const fromObj = (o, depth) => {
+    if (!o || typeof o !== "object" || depth > 3) return null;
+    for (const k of ["access_token", "accessToken", "token", "id_token", "jwt", "bearer", "bearerToken", "accessTokenValue"]) if (typeof o[k] === "string" && o[k].length > 15) return o[k];
+    for (const [k, v] of Object.entries(o)) if (typeof v === "string" && (JWT.test(v) || (/token/i.test(k) && v.length > 20 && !/refresh/i.test(k)))) return v;
+    for (const v of Object.values(o)) { const t = fromObj(v, depth + 1); if (t) return t; }
+    return null;
+  };
+  if (res.json && typeof res.json === "object") return fromObj(res.json, 0);
+  if (typeof res.json === "string" && res.json.length > 15) return res.json;
+  const t = String(res.text || "").trim().replace(/^"|"$/g, "").replace(/^Bearer\s+/i, "");
+  return t.length > 15 && !/\s/.test(t) ? t : null;
+}
+const describeResponse = res => res.json && typeof res.json === "object"
+  ? `JSON, Felder: ${Object.keys(res.json).slice(0, 12).join(", ") || "(leer)"}`
+  : `${res.text ? "kein JSON, " + res.text.length + " Zeichen" : "leere Antwort"}`;
+const accessToken = res => { const t = extractAccessToken(res); if (!t) throw new ApiError(502, `Unerwartete Antwort des Garmin-Token-Endpunkts (HTTP ${res.status}, ${String(res.contentType).split(";")[0] || "ohne Content-Type"}, ${describeResponse(res)}). Bitte im Profil die Diagnose ausführen.`); return t; };
+
 const apiBase = env => (env.GARMIN_API_BASE || "https://personal.connectapi.garmin.com").replace(/\/$/, "");
-const accessToken = body => { const t = body && (body.access_token || body.accessToken || body.token); if (!t) throw new ApiError(502, "Unerwartete Antwort des Garmin-Token-Endpunkts."); return t; };
 
 async function gget(env, token, path, params = {}) {
   const qs = new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString();
@@ -155,7 +177,12 @@ const ACTIONS = {
   async diagnose(uid, body, env) {
     const store = db(env), row = await store.get(uid);
     if (!row || row.status !== "connected" || !row.token_cipher) throw new ApiError(409, "Garmin ist nicht verbunden.");
-    return {endpoints: await diagnose(await freshToken(uid, row, store, env), env)};
+    const {apiKey} = JSON.parse(decrypt(row.token_cipher, env));
+    const res = await exchangeToken(apiKey, env);  // 401 -> Fehlermeldung "Key abgelehnt"
+    const out = {tokenResponse: {status: res.status, contentType: String(res.contentType).split(";")[0], shape: res.json !== null ? shapeOf(res.json) : (res.text ? `text (${res.text.length} Zeichen)` : "leer"), tokenFound: !!extractAccessToken(res)}};
+    const token = extractAccessToken(res);
+    out.endpoints = token ? await diagnose(token, env) : null;
+    return out;
   }
 };
 
