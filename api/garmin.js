@@ -144,8 +144,8 @@ export async function diagnose(token, env = process.env) {
   const to = new Date(), from = new Date(Date.now() - 14 * 864e5), f = isoDay(from), t = isoDay(to), y = isoDay(new Date(Date.now() - 864e5)), out = {};
   const calls = {activities: ENDPOINTS.activities(f, t), hrv: ENDPOINTS.hrv(f, t), bodyBattery: ENDPOINTS.bodyBattery(f, t), steps: ENDPOINTS.steps(f, t), vo2max: ENDPOINTS.vo2max(f, t), sleep: ENDPOINTS.sleep(y), heartRate: ENDPOINTS.heartRate(y),
     // nur Diagnose: enthält dailysummaries Bereitschafts-/Erholungswerte (Training Readiness, Recovery Time)?
-    dailySummaries: ["/usersummary-service/v2/dailysummaries", {startDate: y, endDate: y}], userSummaryDaily: ["/usersummary-service/usersummary/daily", {calendarDate: y}]};
-  await Promise.all(Object.entries(calls).map(async ([name, [path, params]]) => { const r = await gget(env, token, path, params); out[name] = {path, params, status: r.status, shape: shapeOf(r.data)}; }));
+    dailySummaries: ["/usersummary-service/v2/dailysummaries", {startDate: y, endDate: y}, 6], stress: [`/usersummary-service/stats/stress/daily/${f}/${t}`, {}, 4], userSummaryDaily: ["/usersummary-service/usersummary/daily", {calendarDate: y}]};
+  await Promise.all(Object.entries(calls).map(async ([name, [path, params, depth]]) => { const r = await gget(env, token, path, params); out[name] = {path, params, status: r.status, shape: shapeOf(r.data, depth || 3)}; }));
   return out;
 }
 

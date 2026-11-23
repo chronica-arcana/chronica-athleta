@@ -107,7 +107,7 @@ test("Garmin-Funktion: Login-Pflicht, Key-Prüfung, verschlüsselte Ablage, nie 
 
     // Diagnose: nur Struktur, keine persönlichen Werte
     const dg = await call(s.env, {body: {action: "diagnose"}});
-    assert.equal(dg.status, 200); assert.deepEqual(Object.keys(dg.body.endpoints).sort(), ["activities", "bodyBattery", "dailySummaries", "heartRate", "hrv", "sleep", "steps", "userSummaryDaily", "vo2max"]);
+    assert.equal(dg.status, 200); assert.deepEqual(Object.keys(dg.body.endpoints).sort(), ["activities", "bodyBattery", "dailySummaries", "heartRate", "hrv", "sleep", "steps", "stress", "userSummaryDaily", "vo2max"]);
     assert.equal(dg.body.endpoints.activities.shape[0].activityName, "string");
     const dgs = JSON.stringify(dg.body); assert.ok(!dgs.includes("GEHEIM") && !dgs.includes("TOKEN-SECRET") && !dgs.includes("07:30"), "keine Werte in der Diagnose");
 
