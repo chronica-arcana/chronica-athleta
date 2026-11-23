@@ -37,35 +37,27 @@ Kontingente/Modelle ändern sich – bitte beim Anbieter prüfen. Ohne KI-Schlü
 | `SUPABASE_ANON_KEY` | anon public Key |
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role Key (geheim) |
 | `AI_API_KEY` | KI-Schlüssel |
-| `GARMIN_ENC_KEY` | siehe unten (Fernet-Schlüssel) |
 | optional `AI_BASE_URL`, `AI_MODEL`, `AI_DAILY_LIMIT` (Standard 60/Tag/Nutzer) | |
 
-   Schlüssel erzeugen:
-   ```bash
-   python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-   ```
-   Ohne Python geht auch (gleiches Format): `openssl rand -base64 32 | tr '+/' '-_'`
-   Das Deployment funktioniert auch ohne diese Variable; die Garmin-Funktion meldet dann „Server nicht konfiguriert“, bis sie gesetzt ist.
-   **Sichere `GARMIN_ENC_KEY`!** Geht er verloren, müssen alle Nutzer Garmin neu verbinden.
 3. `config.js` im Repo ausfüllen (nur **öffentliche** Werte) und pushen:
    ```js
    window.TT_CONFIG = { supabaseUrl: "https://xyz.supabase.co", supabaseAnonKey: "<anon key>", apiBase: "" };
    ```
 4. Deploy. Öffne die Vercel-Adresse → registrieren → Wizard. Auf dem Handy: „Zum Home-Bildschirm hinzufügen“.
 
-`vercel.json` setzt längere Laufzeiten für die Funktionen (KI 30 s, Garmin 60 s). Auf dem Hobby-Plan gelten Obergrenzen von Vercel.
+`vercel.json` setzt eine längere Laufzeit für die KI-Funktion (30 s). Auf dem Hobby-Plan gelten Obergrenzen von Vercel.
+Framework-Preset in Vercel: **Other**, kein Build-Befehl. Im Hauptordner darf **keine** `requirements.txt`/`pyproject.toml` liegen (sonst erkennt Vercel ein Python-Projekt).
 
-## 4. Garmin verbinden (jeder Nutzer für sich)
+## 4. Garmin
 
-Profil → **Garmin Connect** → eigene Garmin-E-Mail + Passwort → *Verbinden* (ggf. MFA-Code). Das Passwort wird nur einmal an Garmin gesendet und **nicht gespeichert**; gespeichert werden nur Token, verschlüsselt mit `GARMIN_ENC_KEY` in einer Tabelle, die der Browser nicht lesen kann.
-Blockiert Garmin den Login vom Server (Fehler 401/429), nutze den Fallback:
+Aktuell per **Datei-Import**: lokal auf deinem Rechner mit deinem eigenen Account erzeugen und im Profil importieren.
 
 ```bash
 pip install garminconnect
 export GARMIN_EMAIL="…" GARMIN_PASSWORD="…"
 python tools/garmin_export.py --days 90 --out garmin_data.json
 ```
-und importiere `garmin_data.json` im Profil („Export-Datei importieren“).
+Profil → Garmin → „Export-Datei importieren“. Die direkte Anbindung über die offizielle **Garmin Personal API** (eigener API-Key aus Garmin Connect, kein Passwort) folgt.
 
 ## Betrieb & Datenschutz
 

@@ -1,4 +1,4 @@
-// Clients für die serverlosen Funktionen (/api/ai, /api/garmin). Die Funktionen prüfen das Supabase-JWT.
+// Client für die serverlose KI-Funktion (/api/ai). Die Funktion prüft das Supabase-JWT.
 const cfg = () => window.TT_CONFIG || {};
 let adapterRef = null;
 export const bindAdapter = a => { adapterRef = a; };
@@ -21,10 +21,3 @@ export async function ai(task, payload) {
   try { return (await post("/api/ai", {task, payload})).data; }
   catch (e) { if (e.status === 404 || e.status === 503) aiDown = true; throw e; }
 }
-export const garmin = {
-  connect: (email, password) => post("/api/garmin", {action: "connect", email, password}),
-  mfa: code => post("/api/garmin", {action: "mfa", code}),
-  sync: (days = 30) => post("/api/garmin", {action: "sync", days}),
-  disconnect: () => post("/api/garmin", {action: "disconnect"}),
-  status: () => post("/api/garmin", {action: "status"})
-};
