@@ -1,7 +1,7 @@
 import json, sys, unittest, os
 from datetime import datetime, timezone, timedelta
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "api"))
-import garmin as G
+sys.path.insert(0, os.path.dirname(__file__))
+import garmin_api as G
 from cryptography.fernet import Fernet
 
 class FakeSB:

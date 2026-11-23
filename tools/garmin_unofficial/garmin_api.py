@@ -1,4 +1,9 @@
-"""Vercel-Funktion: Garmin-Connect-Anbindung pro Nutzerkonto.
+"""ARCHIV / Referenz (nicht Teil des Vercel-Deployments): Garmin-Connect-Anbindung über die INOFFIZIELLE Bibliothek.
+
+Ersetzt durch die offizielle Garmin Personal API (Key statt Passwort). Bleibt hier für Self-Hosting/Tests erhalten;
+es ist bewusst nicht unter api/, damit Vercel kein Python-Projekt erkennt.
+
+Ursprünglich: Vercel-Funktion: Garmin-Connect-Anbindung pro Nutzerkonto.
 
 Jeder Nutzer trägt seine EIGENEN Garmin-Zugangsdaten im eigenen Konto ein. Das Passwort wird nur einmal für den
 Login an Garmin verwendet und nie gespeichert. Gespeichert werden ausschließlich Zugriffs-Token, verschlüsselt (Fernet)

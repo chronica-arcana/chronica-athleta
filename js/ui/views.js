@@ -122,24 +122,13 @@ export function Progress({onWizard}) {
 }
 
 function GarminCard() {
-  const cloud = S.state.adapter && S.state.adapter.mode === "cloud";
-  const [email, setEmail] = useState(""), [pw, setPw] = useState(""), [code, setCode] = useState(""), [busy, setBusy] = useState(false), [msg, setMsg] = useState(""), [mfa, setMfa] = useState(false);
-  const link = S.state.link, connected = link && link.status === "connected";
-  const wrap = fn => async () => { setBusy(true); setMsg(""); try { await fn(); } catch (e) { setMsg("⚠ " + e.message); } setBusy(false); };
-  const connect = wrap(async () => { const r = await S.garminApi.connect(email.trim(), pw); setPw(""); if (r.status === "mfa_required") { setMfa(true); setMsg("Garmin hat einen Bestätigungscode angefordert."); } else { await S.loadData(); S.toast("Garmin verbunden. Erste Synchronisierung …", "info"); await S.garminSync(30); } });
-  const sendMfa = wrap(async () => { await S.garminApi.mfa(code.trim()); setMfa(false); setCode(""); await S.loadData(); await S.garminSync(30); S.toast("Garmin verbunden.", "info"); });
-  const sync = wrap(async () => { const r = await S.garminSync(30); setMsg(`✓ ${r.activities} Aktivitäten, ${r.daily} Tageswerte synchronisiert.`); });
-  const onFile = async e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (!f) return; setBusy(true); try { const r = await S.importGarminFile(await f.text()); setMsg(`✓ ${r.activities} Aktivitäten, ${r.daily} Tageswerte importiert.`); } catch (err) { setMsg("⚠ " + err.message); } setBusy(false); };
-  const disc = wrap(async () => { await S.garminApi.disconnect(); await S.loadData(); S.toast("Garmin getrennt, Zugangsdaten gelöscht.", "info"); });
-  return html`<div class="card stack"><div class="row"><span style="font-size:1.6rem">⌚</span><div class="grow"><h3>Garmin Connect</h3><div class="small muted">Dein eigener Garmin-Account liefert Aktivitäten, Schlaf, HRV, Ruhepuls & Body Battery.</div></div></div>
-    ${!cloud && html`<div class="banner small">Direkte Verbindung benötigt Cloud-Konto (Supabase + Vercel). Du kannst aber eine Export-Datei importieren (siehe unten).</div>`}
-    ${cloud && connected && html`<div class="row wrap"><span class="chip good">verbunden</span>${link.last_sync_at && html`<span class="chip">Sync: ${String(link.last_sync_at).slice(0, 16).replace("T", " ")}</span>`}${link.last_error && html`<span class="chip warn">${String(link.last_error).slice(0, 60)}</span>`}</div>
-      <div class="row"><button class="btn primary grow" disabled=${busy} onClick=${sync}>${busy ? "…" : "Jetzt synchronisieren"}</button><button class="btn danger" disabled=${busy} onClick=${disc}>Trennen</button></div>`}
-    ${cloud && !connected && !mfa && html`<div class="stack"><label class="field">Garmin-E-Mail<input type="email" autocomplete="off" value=${email} onInput=${e => setEmail(e.target.value)} /></label><label class="field">Garmin-Passwort<input type="password" autocomplete="off" value=${pw} onInput=${e => setPw(e.target.value)} /></label>
-      <button class="btn primary" disabled=${busy || !email || !pw} onClick=${connect}>${busy ? "Verbinde …" : "Verbinden"}</button>
-      <p class="tiny muted">Das Passwort wird nur einmal für die Anmeldung an Garmin genutzt und <b>nicht gespeichert</b>. Gespeichert werden nur verschlüsselte Zugriffs-Token, die nur dein Konto (serverseitig) nutzen kann. Es handelt sich um eine inoffizielle Schnittstelle von Garmin Connect.</p></div>`}
-    ${cloud && mfa && html`<div class="stack"><label class="field">Bestätigungscode (MFA)<input type="text" inputmode="numeric" value=${code} onInput=${e => setCode(e.target.value)} /></label><button class="btn primary" disabled=${busy || !code} onClick=${sendMfa}>Bestätigen</button></div>`}
-    <label class="field">Alternativ: Export-Datei importieren (garmin_data.json)<input type="file" accept="application/json,.json" onChange=${onFile} /></label>
+  const [busy, setBusy] = useState(false), [msg, setMsg] = useState("");
+  const g = S.state.garmin, last = g.daily.length ? g.daily[g.daily.length - 1].date : null;
+  const onFile = async e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (!f) return; setBusy(true); setMsg(""); try { const r = await S.importGarminFile(await f.text()); setMsg(`✓ ${r.activities} Aktivitäten, ${r.daily} Tageswerte importiert.`); } catch (err) { setMsg("⚠ " + err.message); } setBusy(false); };
+  return html`<div class="card stack"><div class="row"><span style="font-size:1.6rem">⌚</span><div class="grow"><h3>Garmin</h3><div class="small muted">Aktivitäten, Schlaf, HRV, Ruhepuls & Body Battery bremsen oder erlauben Steigerungen.</div></div></div>
+    ${g.activities.length || g.daily.length ? html`<div class="row wrap"><span class="chip good">${g.activities.length} Aktivitäten</span><span class="chip">${g.daily.length} Tageswerte</span>${last && html`<span class="chip">bis ${last}</span>`}</div>` : html`<p class="small muted">Noch keine Garmin-Daten.</p>`}
+    <label class="field">Export-Datei importieren (garmin_data.json)<input type="file" accept="application/json,.json" disabled=${busy} onChange=${onFile} /></label>
+    <p class="tiny muted">Die Datei erzeugt <code>tools/garmin_export.py</code> lokal mit deinem eigenen Account. Die direkte Verbindung über die offizielle <b>Garmin Personal API</b> (eigener API-Key statt Passwort) folgt.</p>
     ${msg && html`<div class="banner info small">${msg}</div>`}</div>`;
 }
 

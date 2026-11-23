@@ -1,4 +1,6 @@
 tests
+tools
 supabase/tests
+tools
 docs
 node_modules
