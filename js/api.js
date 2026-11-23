@@ -25,5 +25,6 @@ export const garmin = {
   connect: apiKey => post("/api/garmin", {action: "connect", apiKey}),
   sync: (days = 30) => post("/api/garmin", {action: "sync", days}),
   disconnect: () => post("/api/garmin", {action: "disconnect"}),
-  status: () => post("/api/garmin", {action: "status"})
+  status: () => post("/api/garmin", {action: "status"}),
+  diagnose: () => post("/api/garmin", {action: "diagnose"})
 };

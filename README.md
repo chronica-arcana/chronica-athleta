@@ -15,7 +15,7 @@ der Rest der Woche rechnet sich automatisch neu.
 | **Phasen & Last** | Grundlage → Aufbau → Spezifisch → Tapering (bei Event) bzw. Fundament/Aufbau/Festigung; Entlastungswoche alle 4 Wochen; Wochenlast steigt höchstens ~10 % |
 | **Flexibel** | Tauschen (Kraft ↔ Cardio …), Verschieben, Kürzer/Länger, Auslassen, Hinzufügen, „Woche anpassen“ (nur bestimmte Tage frei). Ausgefallene Kraft wird als 20-Min-Kraft-Snack nachgeholt, verpasste Last höchstens +25 % auf lockere Einheiten verteilt, zu viel Last kürzt den Rest der Woche, keine harten Einheiten hintereinander |
 | **KI-Coach nach dem Training** | Mehr Gewicht / mehr Wiederholungen / halten / reduzieren pro Übung, Hinweise zu Tempo, Pausen, Erholung. Regeln (Double Progression, Schmerz-/RPE-/Garmin-Bremsen) sind immer aktiv; KI-Vorschläge werden darauf begrenzt (max. +10 % Gewicht) |
-| **Garmin (eigener Account)** | Jeder Nutzer trägt im Profil seinen *eigenen* Garmin **Personal API Key** ein (offizielle API, kein Passwort). Der Key wird geprüft und verschlüsselt gespeichert. Aktivitäten, Trainingseffekt, Schlaf, HRV, Ruhepuls und Body Battery bremsen oder erlauben Steigerungen. **Stand:** Key-Verbindung steht; der Datenabruf folgt, sobald die Endpunkte der Personal-API-Doku eingebaut sind – bis dahin Datei-Import (`tools/garmin_export.py`) |
+| **Garmin (eigener Account)** | Jeder Nutzer trägt im Profil seinen *eigenen* Garmin **Personal API Key** ein (offizielle API, kein Passwort). Der Key wird geprüft und verschlüsselt gespeichert; die App holt Aktivitäten, Trainingseffekt, Schlaf, HRV, Ruhepuls und Body Battery. Auffällige Erholung bremst Steigerungen; nicht geplante Aktivitäten lassen sich mit einem Tipp übernehmen. **Stand:** gebaut und mit Fake-Garmin getestet, aber noch nicht gegen einen echten Account bestätigt (Diagnose-Button im Profil) |
 | **Konten** | Supabase Auth (E-Mail/Passwort), Daten per Row Level Security strikt je Konto getrennt, Export als JSON, Konto löschen |
 | **Nur kostenlose Dienste** | Supabase Free, Vercel Hobby, KI über kostenlose Anbieter (Groq/Gemini/OpenRouter), keine Bezahl-APIs |
 
@@ -31,7 +31,7 @@ Browser (statisch, kein Build)                 Vercel (kostenlos)               
 
 * `engine/` – reine Logik ohne UI (Planung, Anpassung, Auswertung, Garmin-Auswertung); mit Tests.
 * `js/` – Store, Datenadapter (Supabase / lokaler Demo-Modus), Oberfläche.
-* `api/` – serverlose Funktionen: `ai.js` (KI-Proxy: feste Prompts, Login-Pflicht, Tageslimit) und `garmin.js` (Garmin Personal API: Key prüfen, verschlüsselt speichern). `_lib.js` = gemeinsame Helfer.
+* `api/` – serverlose Funktionen: `ai.js` (KI-Proxy: feste Prompts, Login-Pflicht, Tageslimit) und `garmin.js` (Garmin Personal API: Key prüfen, verschlüsselt speichern, Daten abrufen, Diagnose). `_lib.js`/`_garmin-map.js` = Helfer.
 * `supabase/migrations` – Schema + Zeilenschutz; `supabase/tests` – Prüfung gegen lokales Postgres.
 * `tools/` – Garmin-Export-Skript (Fallback) und archivierte inoffizielle Garmin-Anbindung.
 * `legacy/` – die frühere Fußball-Reha-Version (läuft weiter, eigene lokale Daten).
@@ -51,6 +51,6 @@ npm test                              # Engine, KI-Proxy, Store/Adapter (Node �
 
 ## Grenzen / ehrliche Hinweise
 
-* **Garmin:** Die Personal API (Key aus dem eigenen Garmin-Connect-Account) ist angebunden, aber der **Datenabruf ist noch nicht implementiert**: Die mir vorliegende Doku beschreibt bisher nur den Token-Austausch. Bis dahin Datei-Import. Die frühere inoffizielle Passwort-Anbindung liegt archiviert unter `tools/garmin_unofficial/` und ist nicht Teil des Deployments.
+* **Garmin:** Pfade stammen aus der Swagger-Übersicht der Personal API; Query-Parameter und Feldnamen der Antworten sind aus dem bekannten Garmin-Connect-Datenmodell abgeleitet und **noch nicht gegen einen echten Account bestätigt**. Der Mapper liest tolerant, der Diagnose-Button im Profil zeigt die echte Struktur. **Nutzungsbedingungen:** Garmin bietet die Personal API für den *persönlichen Gebrauch* an und schließt kommerzielle Anwendungen mit mehreren Endnutzern aus – diese App ist für private, nicht-kommerzielle Nutzung gedacht (Kreis: du/Familie). Für einen öffentlichen Dienst wäre das Garmin Connect Developer Program nötig. Keys laufen nach 30/90/180/365 Tagen ab; die Access-Tokens (24 h) holt die App bei jedem Sync neu.
 * **Kostenlose KI:** Kontingente und Modelle der Anbieter ändern sich; bei Ausfall/Limit arbeitet der Coach regelbasiert weiter.
 * **Medizinisch:** Die App ersetzt keine Untersuchung oder Freigabe durch Arzt/Sportphysio. Im Wiedereinstiegs-Modus wird nur bei dokumentiertem Schmerzwert gesteigert.

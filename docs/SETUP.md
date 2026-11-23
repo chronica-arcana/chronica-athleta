@@ -60,7 +60,11 @@ Framework-Preset in Vercel: **Other**, kein Build-Befehl. Im Hauptordner darf **
 
 Die App tauscht den Key gegen ein Access-Token (Garmin-Endpunkt `personalapitoken-service`), speichert den Key mit AES-256-GCM verschlüsselt in einer Tabelle, die der Browser nicht lesen kann, und gibt ihn nie zurück. Trennen löscht ihn.
 
-**Stand:** Verbinden, Prüfen, Speichern und Trennen funktionieren. Der **Datenabruf** (Aktivitäten, Schlaf, HRV …) ist noch nicht implementiert – dafür fehlen die Endpunkte aus der Personal-API-Doku. Bis dahin per **Datei-Import**:
+**Stand und Fehlersuche:** Verbinden, Prüfen, Speichern, Trennen und der Datenabruf sind gebaut und mit einem nachgebauten Garmin-Server getestet. Die Query-Parameter und Feldnamen der echten Antworten sind **noch nicht bestätigt**. Zeigt „Jetzt synchronisieren“ „Nicht abrufbar: … (HTTP …)“ oder 0 Aktivitäten, tippe im Profil auf **Diagnose** und schick die Ausgabe (nur Feldnamen, keine Werte) – damit lässt sich der Abruf gezielt korrigieren.
+
+**Hinweise zur Personal API:** Sie ist für den *persönlichen Gebrauch* gedacht (kein kommerzieller Dienst für viele Nutzer). Keys laufen nach 30/90/180/365 Tagen ab (Garmin mailt eine Woche vorher); abgelaufene Keys erkennt die App und bittet um einen neuen. Zugriffs-Token gelten 24 h, die App holt bei jedem Sync ein neues.
+
+**Ohne Personal API (Fallback): Datei-Import**
 
 ```bash
 pip install garminconnect

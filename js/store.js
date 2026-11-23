@@ -186,6 +186,7 @@ export async function deleteAccount() { await state.adapter.deleteAccount(); sta
 export async function resetData() { await state.adapter.deleteAllData(); state.plans = []; state.sessions = []; emit(); }
 
 /* ---------- Garmin ---------- */
+export async function reloadGarmin() { const d = await state.adapter.loadAll(); state.garmin = d.garmin; state.link = d.link; emit(); } // still, ohne Ladebildschirm
 export async function refreshLink() { try { state.link = await state.adapter.loadLink(); } catch { /* Status bleibt wie er war */ } emit(); }
 export async function importGarminFile(text) {
   const g = normalizeExport(JSON.parse(text));

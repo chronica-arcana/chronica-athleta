@@ -6,10 +6,12 @@
 //   connect {apiKey}  prüft den Key gegen den Token-Endpunkt und speichert ihn verschlüsselt
 //   status            Verbindungsstatus
 //   disconnect        löscht den gespeicherten Key
-//   sync {days}       Token holen (dokumentiert); Datenabruf: siehe fetchPersonalData (Endpunkte noch offen)
+//   sync {days}       Token holen, Aktivitäten/Schlaf/HRV/Ruhepuls/Body Battery abrufen und speichern
+//   diagnose          zeigt die Struktur (nur Feldnamen) der Garmin-Antworten – zur Fehlersuche, ohne persönliche Werte
 // Umgebungsvariablen: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, GARMIN_ENC_KEY (32 Byte, base64)
 import crypto from "node:crypto";
 import {json, readBody, timedFetch, authenticate} from "./_lib.js";
+import {mapActivity, mapSleep, mapHrv, mapRestingHr, mapBodyBattery, asList, mergeDaily, shapeOf} from "./_garmin-map.js";
 
 // Laut Garmin-Doku (Personal API): API-Key wird gegen ein Access-Token getauscht.
 export const TOKEN_URL = "https://personal.connectapi.garmin.com/personalapitoken-service/personal-api/personal-api-key/token";
@@ -47,6 +49,12 @@ function db(env) {
       const r = await timedFetch(`${url}?on_conflict=user_id`, {method: "POST", headers: {...h, "content-type": "application/json", prefer: "resolution=merge-duplicates"}, body: JSON.stringify({user_id: uid, updated_at: new Date().toISOString(), ...fields})}, 8000);
       if (!r.ok) throw new ApiError(502, "Speichern fehlgeschlagen.");
     },
+    async upsertRows(table, rows, conflict) {
+      for (let i = 0; i < rows.length; i += 200) {
+        const r = await timedFetch(`${env.SUPABASE_URL}/rest/v1/${table}?on_conflict=${conflict}`, {method: "POST", headers: {...h, "content-type": "application/json", prefer: "resolution=merge-duplicates"}, body: JSON.stringify(rows.slice(i, i + 200))}, 15000);
+        if (!r.ok) throw new ApiError(502, "Speichern der Garmin-Daten fehlgeschlagen.");
+      }
+    },
     async remove(uid) { await timedFetch(`${url}?user_id=eq.${encodeURIComponent(uid)}`, {method: "DELETE", headers: h}, 8000); }
   };
 }
@@ -64,11 +72,53 @@ export async function exchangeToken(apiKey, env = process.env) {
   return body; // Format laut Doku noch nicht bekannt: wird in fetchPersonalData ausgewertet
 }
 
-// Datenabruf: Die Endpunkte der Personal API stehen nicht in dem mir vorliegenden Doku-Ausschnitt (nur der Token-Austausch).
-// Hier wird bewusst nichts geraten. Sobald Pfade und Antwortformate vorliegen, wird diese Funktion implementiert
-// und liefert {activities: [...], daily: [...]} im Format von engine/garmin.js (normalizeExport).
-export async function fetchPersonalData(/* token, from, to */) {
-  throw new ApiError(501, "Der Datenabruf der Personal API ist noch nicht eingebaut. Der Key ist gespeichert und gültig; bis dahin bitte den Datei-Import nutzen.");
+const apiBase = env => (env.GARMIN_API_BASE || "https://personal.connectapi.garmin.com").replace(/\/$/, "");
+const accessToken = body => { const t = body && (body.access_token || body.accessToken || body.token); if (!t) throw new ApiError(502, "Unerwartete Antwort des Garmin-Token-Endpunkts."); return t; };
+
+async function gget(env, token, path, params = {}) {
+  const qs = new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString();
+  try {
+    const r = await timedFetch(`${apiBase(env)}${path}${qs ? "?" + qs : ""}`, {headers: {authorization: `Bearer ${token}`, accept: "application/json"}}, 12000);
+    let data = null; try { data = await r.json(); } catch {}
+    return {status: r.status, ok: r.ok, data};
+  } catch { return {status: 0, ok: false, data: null}; }
+}
+async function pool(items, size, fn) { const out = []; let i = 0; await Promise.all(Array.from({length: size}, async () => { while (i < items.length) { const k = i++; out[k] = await fn(items[k]); } })); return out; }
+const isoDay = d => d.toISOString().slice(0, 10);
+
+// Pfade laut Swagger-Übersicht der Personal API; Parameter/Feldnamen siehe _garmin-map.js (noch nicht gegen echten Account bestätigt)
+const ENDPOINTS = {
+  activities: (from, to) => ["/activitylist-service/activities/search/activities", {startDate: from, endDate: to, start: 0, limit: 200}],
+  hrv: (from, to) => [`/hrv-service/hrv/daily/${from}/${to}`, {}],
+  bodyBattery: (from, to) => ["/wellness-service/wellness/bodyBattery/reports/daily", {startDate: from, endDate: to}],
+  sleep: date => ["/sleep-service/sleep/dailySleep", {date}],
+  heartRate: date => ["/wellness-service/wellness/dailyHeartRate", {date}]
+};
+
+export async function fetchPersonalData(token, from, to, env = process.env) {
+  const f = isoDay(from), t = isoDay(to), report = {}, note = (name, r, n) => { const e = report[name] || (report[name] = {ok: 0, failed: 0, items: 0, lastStatus: null}); r.ok ? e.ok++ : e.failed++; e.items += n || 0; e.lastStatus = r.status; };
+  const days = []; for (let d = new Date(from); isoDay(d) <= t; d = new Date(d.getTime() + 864e5)) days.push(isoDay(d));
+  const [acts, hrv, bb] = await Promise.all([["activities", f, t], ["hrv", f, t], ["bodyBattery", f, t]].map(async ([name, a, b]) => { const r = await gget(env, token, ...ENDPOINTS[name](a, b)); return {name, r}; }));
+  const activities = asList(acts.r.data).map(mapActivity).filter(Boolean); note("activities", acts.r, activities.length);
+  const hrvParts = asList(hrv.r.data).map(mapHrv).filter(Boolean); note("hrv", hrv.r, hrvParts.length);
+  const bbParts = asList(bb.r.data).map(mapBodyBattery).filter(Boolean); note("bodyBattery", bb.r, bbParts.length);
+  const perDay = await pool(days, 5, async date => {
+    const [s, h] = await Promise.all([gget(env, token, ...ENDPOINTS.sleep(date)), gget(env, token, ...ENDPOINTS.heartRate(date))]);
+    const sp = s.ok ? mapSleep(s.data, date) : null, hp = h.ok ? mapRestingHr(h.data, date) : null;
+    note("sleep", s, sp ? 1 : 0); note("heartRate", h, hp ? 1 : 0);
+    return [sp, hp];
+  });
+  const rs = [acts.r, hrv.r, bb.r];
+  if (rs.every(r => r.status === 401 || r.status === 403)) throw new ApiError(401, "Garmin hat den Zugriff verweigert – Key abgelaufen oder widerrufen?");
+  return {activities, daily: mergeDaily([hrvParts, bbParts, ...perDay]), report};
+}
+
+// Fehlersuche: Struktur (nur Feldnamen) der echten Antworten
+export async function diagnose(token, env = process.env) {
+  const to = new Date(), from = new Date(Date.now() - 14 * 864e5), f = isoDay(from), t = isoDay(to), y = isoDay(new Date(Date.now() - 864e5)), out = {};
+  const calls = {activities: ENDPOINTS.activities(f, t), hrv: ENDPOINTS.hrv(f, t), bodyBattery: ENDPOINTS.bodyBattery(f, t), sleep: ENDPOINTS.sleep(y), heartRate: ENDPOINTS.heartRate(y)};
+  await Promise.all(Object.entries(calls).map(async ([name, [path, params]]) => { const r = await gget(env, token, path, params); out[name] = {path, params, status: r.status, shape: shapeOf(r.data)}; }));
+  return out;
 }
 
 /* ---------- Aktionen ---------- */
@@ -89,21 +139,36 @@ const ACTIONS = {
   async sync(uid, body, env) {
     const store = db(env), row = await store.get(uid);
     if (!row || row.status !== "connected" || !row.token_cipher) throw new ApiError(409, "Garmin ist nicht verbunden.");
-    const {apiKey} = JSON.parse(decrypt(row.token_cipher, env));
-    let token;
-    try { token = await exchangeToken(apiKey, env); }
-    catch (e) { if (e.status === 401) await store.save(uid, {status: "error", last_error: "Key abgelehnt oder abgelaufen"}); throw e; }
+    const minGap = env.GARMIN_MIN_SYNC_SECONDS !== undefined ? Number(env.GARMIN_MIN_SYNC_SECONDS) : 120;
+    if (row.last_sync_at && Date.now() - Date.parse(row.last_sync_at) < minGap * 1000) throw new ApiError(429, "Bitte kurz warten – es wurde gerade synchronisiert.");
+    const token = await freshToken(uid, row, store, env);
     const days = Math.max(1, Math.min(45, parseInt(body.days, 10) || 14));
-    const to = new Date(), from = new Date(Date.now() - days * 864e5);
-    const data = await fetchPersonalData(token, from, to);
-    return {activities: (data.activities || []).length, daily: (data.daily || []).length};
+    let data;
+    try { data = await fetchPersonalData(token, new Date(Date.now() - days * 864e5), new Date(), env); }
+    catch (e) { if (e.status === 401) await store.save(uid, {status: "error", last_error: "Zugriff verweigert (Key abgelaufen oder widerrufen)"}); throw e; }
+    if (data.activities.length) await store.upsertRows("garmin_activities", data.activities.map(({id, date, ...rest}) => ({user_id: uid, id, date, data: rest})), "user_id,id");
+    if (data.daily.length) await store.upsertRows("garmin_daily", data.daily.map(({date, ...rest}) => ({user_id: uid, date, data: rest})), "user_id,date");
+    const failed = Object.entries(data.report).filter(([, v]) => v.ok === 0 && v.failed > 0).map(([k, v]) => `${k} (HTTP ${v.lastStatus})`);
+    await store.save(uid, {last_sync_at: new Date().toISOString(), last_error: failed.length ? `Nicht abrufbar: ${failed.join(", ")}`.slice(0, 200) : null});
+    return {activities: data.activities.length, daily: data.daily.length, report: data.report};
+  },
+  async diagnose(uid, body, env) {
+    const store = db(env), row = await store.get(uid);
+    if (!row || row.status !== "connected" || !row.token_cipher) throw new ApiError(409, "Garmin ist nicht verbunden.");
+    return {endpoints: await diagnose(await freshToken(uid, row, store, env), env)};
   }
 };
+
+async function freshToken(uid, row, store, env) {
+  const {apiKey} = JSON.parse(decrypt(row.token_cipher, env));
+  try { return accessToken(await exchangeToken(apiKey, env)); }
+  catch (e) { if (e.status === 401) await store.save(uid, {status: "error", last_error: "Key abgelehnt oder abgelaufen"}); throw e; }
+}
 
 export default async function handler(req, res, env = process.env) {
   res.setHeader("x-content-type-options", "nosniff");
   try {
-    if (req.method === "GET") return json(res, 200, {ok: true, function: "garmin", encKey: Buffer.from(env.GARMIN_ENC_KEY || "", "base64").length === 32, supabaseServiceKey: !!env.SUPABASE_SERVICE_ROLE_KEY, dataFetchImplemented: false});
+    if (req.method === "GET") return json(res, 200, {ok: true, function: "garmin", encKey: Buffer.from(env.GARMIN_ENC_KEY || "", "base64").length === 32, supabaseServiceKey: !!env.SUPABASE_SERVICE_ROLE_KEY, dataFetchImplemented: true});
     if (req.method !== "POST") return json(res, 405, {error: "Nur POST."});
     let body; try { body = await readBody(req); } catch { return json(res, 400, {error: "Ungültige Anfrage."}); }
     const action = body && body.action;
