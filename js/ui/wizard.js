@@ -42,10 +42,14 @@ export function Wizard({onClose, first}) {
     currentWeeklyMinutes: 120, daysPerWeek: 3, minutesPerSession: 45, preferredDays: [], startDate: today(), equipment: "none", injury: false, limitations: "", strengthPerWeek: undefined, followUps: []});
   const [step, setStep] = useState(0), [busy, setBusy] = useState(false), [aiNote, setAiNote] = useState("");
   const [questions, setQuestions] = useState(null), [coach, setCoach] = useState(null), [preview, setPreview] = useState(null);
+  const [short, setShort] = useState(false), [covered, setCovered] = useState({}), [edit, setEdit] = useState(null); // Kurzmodus: KI hat Angaben aus dem Freitext erkannt
   const set = patch => setG(prev => ({...prev, ...patch}));
   const isEvent = g.goalType === "event";
-  const steps = ["goal", "type", "sports", isEvent ? "event" : "duration", "level", "time", "equip", "fine", "preview"];
-  const cur = steps[step];
+  const whenStep = isEvent ? "event" : "duration";
+  // Kurzmodus: nur noch fragen, was die KI nicht aus dem Freitext erkannt hat, dann Zusammenfassung und Vorschau
+  const missing = [["type", "type"], ["sports", "sports"], ["when", whenStep], ["level", "level"], ["time", "time"], ["equip", "equip"]].filter(([k]) => !covered[k]).map(([, s]) => s);
+  const steps = short ? ["goal", ...missing, "review", "preview"] : ["goal", "type", "sports", whenStep, "level", "time", "equip", "fine", "preview"];
+  const cur = edit || steps[step];
   const draftGoal = () => ({...g, mode: g.goalType === "return" ? "return" : g.goalType === "health" ? "health" : "performance", event: isEvent && g.event.date ? g.event : isEvent && g.event.preset ? {...g.event, date: undefined} : undefined, title: undefined});
   const eventPreset = EVENT_PRESETS[g.event.preset];
 
@@ -57,6 +61,10 @@ export function Wizard({onClose, first}) {
       const patch = {...d}; if (d.event) patch.event = {...g.event, ...d.event};
       if (d.event && !d.goalType) patch.goalType = "event";
       set(patch); setAiNote("Die KI hat deine Angaben vorausgefüllt – bitte prüfen und anpassen.");
+      const sp = d.sports || [];
+      setCovered({type: !!(d.goalType || d.event), sports: sp.length > 0, when: !!(d.weeks || (d.event && d.event.date)), level: !!d.level, time: !!d.daysPerWeek,
+        equip: !!d.equipment || (!sp.includes("strength") && d.goalType !== "return")});
+      setShort(true);
     } catch (e) { setAiNote(`KI nicht erreichbar (${e.message}) – bitte die Felder selbst ausfüllen.`); }
     setBusy(false); setStep(1);
   };
@@ -88,7 +96,7 @@ export function Wizard({onClose, first}) {
     if (cur === "event") return !!g.event.preset && (!g.event.date || g.event.date > g.startDate);
     return true;
   };
-  const next = () => { if (cur === "goal") return analyze(); setStep(s => Math.min(steps.length - 1, s + 1)); };
+  const next = () => { if (cur === "goal") return analyze(); if (edit) { setEdit(null); return; } setStep(s => Math.min(steps.length - 1, s + 1)); };
   const toggleSport = s => { const has = g.sports.includes(s); const sports = has ? g.sports.filter(x => x !== s) : [...g.sports, s]; set({sports, primary: sports.includes(g.primary) ? g.primary : sports[0] || null}); };
   const create = async () => {
     setBusy(true);
@@ -141,27 +149,37 @@ export function Wizard({onClose, first}) {
         ${questions === null ? html`<${Spinner} text="KI stellt passende Rückfragen …" />` : questions.map(q => html`<div class="q"><h3>${q.text}</h3>
           ${Array.isArray(q.options) && q.options.length ? html`<div class="choices">${q.options.slice(0, 5).map(o => { const v = String(o).slice(0, 80), sel = (g.followUps.find(f => f.q === q.text) || {}).a === v; return html`<${Option} compact=${true} sel=${sel} onClick=${() => answer(q, sel ? "" : v)}>${v}<//>`; })}</div>`
             : html`<input type="text" maxlength="200" value=${(g.followUps.find(f => f.q === q.text) || {}).a || ""} onInput=${e => answer(q, e.target.value)} />`}</div>`)}</div>`;
+      case "review": {
+        const evLabel = (EVENT_PRESETS[g.event.preset] || {}).label || "Event", lvl = (LEVELS.find(l => l.v === g.level) || {}).t, eq = (EQUIP.find(l => l.v === g.equipment) || {}).t;
+        const rows = [["type", "Ziel", (GOAL_TYPES.find(t => t.v === g.goalType) || {}).t],
+          ["sports", "Sportarten", g.sports.map(s => SPORTS[s].label).join(", ") + (g.sports.length > 1 && g.primary ? ` (Haupt: ${SPORTS[g.primary].label})` : "")],
+          [whenStep, "Zeitraum", isEvent ? `${g.event.name || evLabel}${g.event.date ? " am " + fmtDay(g.event.date) : ", " + g.weeks + " Wochen"}` : `${g.weeks} Wochen`],
+          ["level", "Niveau", lvl], ["time", "Training", `${g.daysPerWeek} Tage pro Woche, ${g.minutesPerSession} Min, Start ${fmtDay(g.startDate)}`],
+          ["equip", g.sports.includes("strength") ? "Ausstattung" : "Beschwerden", g.sports.includes("strength") ? eq + (g.injury ? ", vorsichtiger Modus" : "") : (g.injury ? "vorsichtiger Modus" : "keine")]];
+        return html`<div class="stack"><div><h1>Passt das so?</h1><p class="muted" style="margin-top:6px">Das hat die KI aus deiner Beschreibung erkannt. Tippe auf eine Zeile, um etwas zu ändern.</p></div>
+          <div class="list">${rows.map(([k, label, val]) => html`<button class="li" onClick=${() => setEdit(k)}><div class="grow"><div class="s">${label}</div><div class="t">${val || "–"}</div></div><span class="link">Ändern</span></button>`)}</div></div>`;
+      }
       case "preview": {
         if (!preview) return html`<${Spinner} text="Plan wird berechnet …" />`;
         const p = preview.plan;
-        const sample = preview.sessions.filter(s => s.week === 1).length ? preview.sessions.filter(s => s.week === 1) : preview.sessions.filter(s => s.week === 0);
+        const first1 = preview.sessions.slice().sort((a, b) => a.date.localeCompare(b.date))[0];
         return html`<div class="stack gap-lg"><div><span class="label">Dein Plan</span><h1 style="margin-top:6px">${coach && coach.title || p.title}</h1>
           <p class="sub">${fmtDay(p.startDate)} – ${fmtDay(p.endDate)} · ${p.meta.phases.reduce((a, x) => a + x.toWeek - x.fromWeek + 1, 0)} Wochen · ${preview.sessions.length} Einheiten</p></div>
           ${coach === null ? html`<div class="card stack"><div class="skeleton" style="width:90%"></div><div class="skeleton" style="width:70%"></div></div>` : coach.summary && html`<div class="card stack tight"><span class="label">Coach</span><p>${coach.summary}</p>${coach.tips && coach.tips.length ? html`<ul style="margin:6px 0 0;padding-left:18px" class="small muted">${coach.tips.map(t => html`<li>${t}</li>`)}</ul>` : ""}</div>`}
           ${p.meta.warnings.map(w => html`<div class="note warn">${w}</div>`)}
           <div class="section"><span class="label">Phasen</span><div class="list">${p.meta.phases.map(ph => html`<div class="li"><div class="grow"><div class="t">${ph.name}</div><div class="s">${ph.focus}</div></div><span class="tag">${ph.toWeek - ph.fromWeek + 1} Wo.</span></div>`)}</div></div>
-          <div class="section"><span class="label">Beispielwoche</span><div class="list">${sample.map(s => html`<div class="li"><span class="bar" style=${`background:${SPORTS[s.sport].color}`}></span><div class="grow"><div class="t">${s.title}</div><div class="s">${fmtShort(s.date)} · ${sessionLine(s)} · ${INTENSITY_TXT[s.intensity]}</div></div></div>`)}</div></div>
-          <p class="small muted">Der Plan ist kein starres Korsett: Du kannst Einheiten jederzeit tauschen, verschieben oder auslassen. Der Rest der Woche passt sich an.</p></div>`;
+          ${first1 && html`<div class="section"><span class="label">Deine erste Einheit</span><div class="list"><div class="li"><span class="bar" style=${`background:${SPORTS[first1.sport].color}`}></span><div class="grow"><div class="t">${first1.title}</div><div class="s">${fmtShort(first1.date)} · ${sessionLine(first1)} · ${INTENSITY_TXT[first1.intensity]}</div></div></div></div></div>`}
+          <p class="small muted">Du brauchst nur die nächste Einheit: Der Coach passt den Plan nach jedem Training und jedem Garmin-Tag neu an. Alles Spätere ist vorläufig.</p></div>`;
       }
     }
   };
   const last = step === steps.length - 1;
   return html`<div class="wiz"><div class="wiz-in">
-    <div class="row between">${first ? html`<span></span>` : html`<button class="btn ghost sm" onClick=${onClose} aria-label="Abbrechen">Abbrechen</button>`}<span class="tiny muted">Schritt ${step + 1} von ${steps.length}</span></div>
-    <div class="progressbar" style="margin-top:10px"><i style=${`width:${(step + 1) / steps.length * 100}%`}></i></div>
+    <div class="row between">${first ? html`<span></span>` : html`<button class="btn ghost sm" onClick=${onClose} aria-label="Abbrechen">Abbrechen</button>`}<span class="tiny muted">${edit ? "Ändern" : `Schritt ${step + 1} von ${steps.length}`}</span></div>
+    <div class="progressbar" style="margin-top:10px"><i style=${`width:${(edit ? steps.indexOf("review") + 1 : step + 1) / steps.length * 100}%`}></i></div>
     <div class="wiz-body">${body()}</div>
-    <div class="wiz-foot">${step > 0 && html`<button class="btn" onClick=${() => setStep(s => s - 1)} disabled=${busy}>Zurück</button>`}
+    <div class="wiz-foot">${(edit || step > 0) && html`<button class="btn" onClick=${() => edit ? setEdit(null) : setStep(s => s - 1)} disabled=${busy}>${edit ? "Abbrechen" : "Zurück"}</button>`}
       ${last ? html`<button class="btn primary grow" onClick=${create} disabled=${busy || !preview || coach === null}>${busy ? "Wird erstellt …" : "Plan starten"}</button>`
-        : html`<button class="btn primary grow" onClick=${next} disabled=${!canNext() || busy}>${busy ? html`<span class="spin"></span> KI liest dein Ziel …` : cur === "goal" && !g.text.trim() ? "Ohne Beschreibung weiter" : "Weiter"}</button>`}</div>
+        : html`<button class="btn primary grow" onClick=${next} disabled=${!canNext() || busy}>${busy ? html`<span class="spin"></span> KI liest dein Ziel …` : edit ? "Übernehmen" : cur === "goal" && !g.text.trim() ? "Ohne Beschreibung weiter" : cur === "review" ? "Plan berechnen" : "Weiter"}</button>`}</div>
   </div></div>`;
 }

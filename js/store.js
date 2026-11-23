@@ -3,11 +3,13 @@ import {ai, bindAdapter, aiAvailable, garmin as garminApi} from "./api.js";
 import {generatePlan, normalizeGoal, defaultTitle, EVENT_PRESETS} from "../engine/planner.js";
 import * as A from "../engine/adapt.js";
 import {recoveryFlags, activityFlags, matchActivities, importSuggestions, normalizeExport} from "../engine/garmin.js";
+import {readiness} from "../engine/readiness.js";
+import {applyReadiness, importGarminActivities} from "../engine/auto.js";
 import {kindInfo, SPORTS, PICKABLE_SPORTS} from "../engine/catalog.js";
 import {todayISO, uuid, addDays, weekStart} from "../engine/dates.js";
 
 export const state = {phase: "loading", adapter: null, user: null, plans: [], sessions: [], garmin: {activities: [], daily: []}, link: null,
-  settings: {autoApply: true}, toasts: [], busy: false, error: "", recovering: false};
+  settings: {autoApply: true}, toasts: [], busy: false, error: "", recovering: false, syncing: false, syncError: ""};
 const subs = new Set();
 export const subscribe = fn => { subs.add(fn); return () => subs.delete(fn); };
 export const emit = () => subs.forEach(fn => fn());
@@ -50,6 +52,7 @@ export async function loadData() {
     state.phase = "app";
   } catch (e) { state.error = errText(e); state.phase = "error"; }
   emit();
+  if (state.phase === "app") { await afterGarminData(); autoSync(); }
 }
 
 /* ---------- Anwenden eines Engine-Ergebnisses ---------- */
@@ -181,9 +184,36 @@ export const auth = {
   reset: e => state.adapter.resetPassword(e),
   updatePassword: async p => { await state.adapter.updatePassword(p); state.recovering = false; emit(); }
 };
-export async function exportData() { return state.adapter.exportAll(); }
 export async function deleteAccount() { await state.adapter.deleteAccount(); state.plans = []; state.sessions = []; state.user = null; state.phase = "auth"; emit(); }
 export async function resetData() { await state.adapter.deleteAllData(); state.plans = []; state.sessions = []; emit(); }
+
+/* ---------- Garmin: Auto-Sync, Übernahme der Aktivitäten, Anpassung nach Erholung ---------- */
+export const readinessFor = date => readiness(state.garmin.daily, date, {activities: state.garmin.activities, sessions: state.sessions});
+export const getReadiness = () => readinessFor(today());
+export function nextSession() {
+  const t = today(), list = planSessions().filter(s => s.status === "planned" && s.date >= t).sort((a, b) => a.date.localeCompare(b.date));
+  return list[0] || null;
+}
+// Garmin-Aktivitäten als Einheiten übernehmen und die heutige Einheit an die Erholung anpassen (beides idempotent)
+export async function afterGarminData() {
+  const p = activePlan(); if (!p) return;
+  const imp = importGarminActivities(p, state.sessions.filter(s => s.planId === p.id), state.garmin.activities, today(), addDays(today(), -10));
+  if (imp.count) { await commit(imp, {silent: true}); toast(imp.count === 1 ? imp.notes[0] : `${imp.count} Garmin-Aktivitäten übernommen. Die Woche passt sich an.`, "adapt", 6000); }
+  const rd = getReadiness(); if (!rd) return;
+  const p2 = activePlan(), res = applyReadiness(p2, state.sessions.filter(s => s.planId === p2.id), today(), rd);
+  if (res.sessions.length) { await commit(res, {silent: true}); toast(res.notes[0], "adapt", 7000); }
+}
+let lastSyncTry = 0;
+export async function autoSync({force = false} = {}) {
+  const link = state.link;
+  if (state.syncing || !state.adapter || state.adapter.mode !== "cloud" || !link || link.status !== "connected") return;
+  const last = link.last_sync_at ? Date.parse(link.last_sync_at) : 0;
+  if (!force && (Date.now() - last < 20 * 60000 || Date.now() - lastSyncTry < 5 * 60000)) return;
+  lastSyncTry = Date.now(); state.syncing = true; state.syncError = ""; emit();
+  try { await garminApi.sync(last ? 7 : 30); await reloadGarmin(); await afterGarminData(); }
+  catch (e) { state.syncError = errText(e); }
+  state.syncing = false; emit();
+}
 
 /* ---------- Garmin ---------- */
 export async function reloadGarmin() { const d = await state.adapter.loadAll(); state.garmin = d.garmin; state.link = d.link; emit(); } // still, ohne Ladebildschirm
@@ -194,7 +224,7 @@ export async function importGarminFile(text) {
   const a = new Map(state.garmin.activities.map(x => [x.id, x])); g.activities.forEach(x => a.set(x.id, x));
   const d = new Map(state.garmin.daily.map(x => [x.date, x])); g.daily.forEach(x => d.set(x.date, x));
   state.garmin = {activities: [...a.values()].sort((x, y) => (x.date + x.start).localeCompare(y.date + y.start)), daily: [...d.values()].sort((x, y) => x.date.localeCompare(y.date))};
-  emit(); return {activities: g.activities.length, daily: g.daily.length};
+  emit(); await afterGarminData(); return {activities: g.activities.length, daily: g.daily.length};
 }
 export const garminSuggestions = () => importSuggestions(state.garmin.activities, state.sessions, addDays(today(), -10));
 export { garminApi, ai, aiAvailable, A, SPORTS, PICKABLE_SPORTS, kindInfo, EVENT_PRESETS, defaultTitle, normalizeGoal, todayISO, uuid, addDays, weekStart };

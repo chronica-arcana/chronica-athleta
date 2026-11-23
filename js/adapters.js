@@ -45,7 +45,6 @@ export class LocalAdapter {
     const dd = new Map(cur.daily.map(x => [x.date, x])); (g.daily || []).forEach(x => dd.set(x.date, x));
     d.garmin = {activities: [...a.values()], daily: [...dd.values()]}; this._write(d);
   }
-  async exportAll() { return this._read(); }
   async deleteAllData() { localStorage.removeItem(this.key); }
   async deleteAccount() { await this.deleteAllData(); }
 }
@@ -109,7 +108,6 @@ export class SupabaseAdapter {
     for (let i = 0; i < acts.length; i += 300) await this._ok(this.sb.from("garmin_activities").upsert(acts.slice(i, i + 300)));
     for (let i = 0; i < daily.length; i += 300) await this._ok(this.sb.from("garmin_daily").upsert(daily.slice(i, i + 300)));
   }
-  async exportAll() { return this.loadAll(); }
   async deleteAllData() {
     await this._ok(this.sb.from("sessions").delete().not("id", "is", null));
     await this._ok(this.sb.from("plans").delete().not("id", "is", null));

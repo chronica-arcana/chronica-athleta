@@ -42,4 +42,5 @@ function App() {
 
 render(html`<${App} />`, document.getElementById("app"));
 S.boot();
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") S.autoSync(); }); // beim Zurückkehren in die App erneut synchronisieren (max. alle 20 Min)
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("./sw.js").catch(() => {});
