@@ -74,8 +74,33 @@ export function extractJson(text) {
   if (!m) throw new Error("no json");
   return JSON.parse(m[0]);
 }
+// Modellwahl: AI_MODEL (fest) oder automatisch das beste verfügbare Chat-Modell des Anbieters (Modelle wechseln oft).
+const PREFERRED = ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "meta-llama/llama-4-maverick-17b-128e-instruct", "meta-llama/llama-4-scout-17b-16e-instruct", "llama-3.1-8b-instant", "openai/gpt-oss-120b", "openai/gpt-oss-20b"];
+const EXCLUDE = /whisper|guard|tts|playai|embed|vision|compound|moderation|orpheus|transcri|speech|image/i;
+export function pickModel(ids) {
+  const usable = ids.filter(id => !EXCLUDE.test(id));
+  for (const p of PREFERRED) if (usable.includes(p)) return p;
+  const size = id => { const m = id.match(/(\d+(?:\.\d+)?)b\b/i); return m ? parseFloat(m[1]) : 0; };
+  const chat = usable.filter(id => /llama|qwen|gemma|mistral|kimi|gpt/i.test(id)).sort((a, b) => size(b) - size(a));
+  return chat[0] || usable[0] || null;
+}
+const modelCache = new Map();
+export async function listModels(env = process.env) {
+  const base = (env.AI_BASE_URL || "https://api.groq.com/openai/v1").replace(/\/$/, "");
+  const key = base + "|" + (env.AI_API_KEY || "").slice(-6), hit = modelCache.get(key);
+  if (hit && Date.now() - hit.t < 600000) return hit.ids;
+  const r = await timedFetch(`${base}/models`, {headers: {authorization: `Bearer ${env.AI_API_KEY}`}}, 8000);
+  if (!r.ok) throw new Error("models " + r.status);
+  const j = await r.json(), ids = (j.data || []).map(m => m.id).filter(Boolean);
+  modelCache.set(key, {t: Date.now(), ids}); return ids;
+}
+export async function resolveModel(env = process.env) {
+  if (env.AI_MODEL) return env.AI_MODEL;
+  try { return pickModel(await listModels(env)) || "llama-3.3-70b-versatile"; } catch { return "llama-3.3-70b-versatile"; }
+}
+
 export async function callModel(task, payload, env = process.env) {
-  const base = (env.AI_BASE_URL || "https://api.groq.com/openai/v1").replace(/\/$/, ""), model = env.AI_MODEL || "llama-3.3-70b-versatile";
+  const base = (env.AI_BASE_URL || "https://api.groq.com/openai/v1").replace(/\/$/, ""), model = await resolveModel(env);
   const messages = [{role: "system", content: TASKS[task].system}, {role: "user", content: "Datenblock:\n" + JSON.stringify(payload)}];
   const redact = t => String(t || "").split(env.AI_API_KEY).join("…").slice(0, 160);
   let last = null;
@@ -104,7 +129,7 @@ export async function liveCheck(env = process.env) {
     return {status: r.status, exists: r.status !== 404, keyAccepted: r.status !== 401 && r.status !== 403};
   }) : {error: "Variable fehlt"};
   live.aiProvider = env.AI_API_KEY ? await probe(async () => { const base = (env.AI_BASE_URL || "https://api.groq.com/openai/v1").replace(/\/$/, ""); const r = await timedFetch(`${base}/models`, {headers: {authorization: `Bearer ${env.AI_API_KEY}`}}, 8000); const out = {status: r.status, keyAccepted: r.ok};
-    if (r.ok) { try { const j = await r.json(), ids = (j.data || []).map(m => m.id).filter(Boolean), want = env.AI_MODEL || "llama-3.3-70b-versatile"; out.modelAvailable = ids.includes(want); out.models = ids.slice(0, 40); } catch {} }
+    if (r.ok) { try { const j = await r.json(), ids = (j.data || []).map(m => m.id).filter(Boolean), want = env.AI_MODEL || pickModel(ids); out.modelConfigured = env.AI_MODEL || "(automatisch)"; out.modelUsed = want; out.modelAvailable = ids.includes(want); out.models = ids.slice(0, 40); } catch {} }
     return out; }) : {error: "Variable fehlt"};
   return live;
 }
@@ -113,7 +138,7 @@ export default async function handler(req, res, env = process.env) {
   res.setHeader("x-content-type-options", "nosniff");
   if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
   if (req.method === "GET") { // Gesundheitscheck für die Einrichtung: nur ja/nein bzw. Statuscodes, keine Werte
-    const out = {ok: true, function: "ai", aiKey: !!env.AI_API_KEY, supabaseUrl: !!env.SUPABASE_URL, supabaseAnonKey: !!env.SUPABASE_ANON_KEY, serviceRoleKey: !!env.SUPABASE_SERVICE_ROLE_KEY, model: env.AI_MODEL || "llama-3.3-70b-versatile"};
+    const out = {ok: true, function: "ai", aiKey: !!env.AI_API_KEY, supabaseUrl: !!env.SUPABASE_URL, supabaseAnonKey: !!env.SUPABASE_ANON_KEY, serviceRoleKey: !!env.SUPABASE_SERVICE_ROLE_KEY, model: env.AI_MODEL || "(automatisch)"};
     if (String(req.url || "").includes("check=1")) out.live = await liveCheck(env);
     return json(res, 200, out);
   }

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
-import handler, {extractJson, TASKS} from "../api/ai.js";
+import handler, {extractJson, TASKS, pickModel, resolveModel} from "../api/ai.js";
 
 function server(fn) { return new Promise(r => { const s = http.createServer(fn); s.listen(0, () => r(s)); }); }
 const call = async (env, {method = "POST", headers = {}, body, url = "/api/ai"} = {}) => {
@@ -72,4 +72,16 @@ test("AI-Handler: Auth, Limit, Aufgabenprüfung, Modellaufruf", async () => {
     const live = await call(bigEnv, {method: "GET", url: "/api/ai?check=1"});
     assert.equal(live.body.live.aiProvider.modelAvailable, true); assert.deepEqual(live.body.live.aiProvider.models, ["m", "andere"]);
   } finally { sb.close(); llm.close(); }
+});
+
+test("Modellwahl: bevorzugt bekannte Chat-Modelle, ignoriert Audio/Guard, respektiert AI_MODEL", async () => {
+  assert.equal(pickModel(["whisper-large-v3", "llama-guard-4-12b", "llama-3.1-8b-instant", "meta-llama/llama-4-scout-17b-16e-instruct"]), "meta-llama/llama-4-scout-17b-16e-instruct");
+  assert.equal(pickModel(["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]), "llama-3.3-70b-versatile");
+  assert.equal(pickModel(["foo-tts", "qwen/qwen3-32b", "gemma2-9b-it"]), "qwen/qwen3-32b", "größtes Chat-Modell als Fallback");
+  assert.equal(pickModel(["whisper-large-v3", "playai-tts"]), null);
+  assert.equal(await resolveModel({AI_MODEL: "mein-modell"}), "mein-modell");
+  const srv = await server((q, r) => { r.setHeader("content-type", "application/json"); r.end(JSON.stringify({data: [{id: "whisper-large-v3"}, {id: "llama-3.1-8b-instant"}, {id: "openai/gpt-oss-20b"}]})); });
+  try { assert.equal(await resolveModel({AI_API_KEY: "key-abc123", AI_BASE_URL: `http://127.0.0.1:${srv.address().port}/v1`}), "llama-3.1-8b-instant"); }
+  finally { srv.close(); }
+  assert.equal(await resolveModel({AI_API_KEY: "x", AI_BASE_URL: "http://127.0.0.1:9/v1"}), "llama-3.3-70b-versatile", "Fallback, wenn Modellliste nicht abrufbar");
 });
