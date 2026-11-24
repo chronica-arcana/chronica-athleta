@@ -110,6 +110,13 @@ export function buildSession(kind, minutes, ctx = {}) {
         ? [WARM(10), B("Haupteil", `${Math.max(10, m - 20)} Min Ball-/Laufformen im submaximalen Tempo (keine Sprints, keine harten Richtungswechsel)`), COOL(10)]
         : [WARM(10, "Lauf-ABC, Mobilisation"), B("Haupteil", `4 × 4 Min Intervalle mit Ball/Lauf (${rpe.hard}) / 3 Min locker; danach 6 × 20 m Beschleunigung mit Gehpause`), COOL(10)];
       break;
+    case "climb_easy":
+      out.blocks = [WARM(10, "leichte Boulder, Schultern und Finger langsam aufwärmen"), B("Haupteil", `${Math.max(10, m - 20)} Min Boulder im unteren bis mittleren Schwierigkeitsgrad: viele Routen, saubere Fußarbeit, Bewegungsqualität vor Schwierigkeit`), COOL(10)];
+      break;
+    case "climb_hard":
+      out.blocks = [WARM(15, "stufenweise steigern, Finger und Schultern gut vorbereiten"), B("Haupteil", `${Math.max(10, m - 30)} Min Projekte: 4–6 Versuche nahe am Limit mit 3–4 Min Pause, Qualität statt Menge`), COOL(10)];
+      if (caution) out.blocks.push(B("Vorsicht", "Finger und Schultern schonen: keine Maximalzüge, bei Fingerschmerz abbrechen."));
+      break;
     case "team_match":
       out.blocks = [B("Einheit", `${m} Min Spiel / Mannschaftstraining. Vorher gut aufwärmen, nachher Belastung (RPE) und Beschwerden eintragen.`)];
       break;

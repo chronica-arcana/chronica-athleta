@@ -7,6 +7,7 @@ import {recoveryFlags, sportOfActivity} from "../../engine/garmin.js";
 import {computeStats} from "../../engine/stats.js";
 import {computeAwards} from "../../engine/awards.js";
 import {InsightsList} from "./insights.js";
+import {ExcludeSheet} from "./session.js";
 
 const weekOf = (plan, t) => Math.floor(diffDays(weekStart(t), weekStart(plan.startDate)) / 7);
 const phaseAt = (plan, idx) => plan.meta.phases.find(p => idx >= p.fromWeek && idx <= p.toWeek) || plan.meta.phases[plan.meta.phases.length - 1];
@@ -16,7 +17,7 @@ const weekLoads = (plan, sessions, ws) => {
   const planned = all.filter(s => s.status === "planned").reduce((a, s) => a + s.load, 0);
   return {done, planned, target: plan.meta.weekTargets[ws] ?? done + planned, all};
 };
-const DEFAULT_KIND = {run: "run_easy", bike: "bike_easy", swim: "swim_endurance", strength: "strength_full", football: "football_skills", cardio: "cardio_easy", mobility: "mobility", walk: "walk"};
+const DEFAULT_KIND = {run: "run_easy", bike: "bike_easy", swim: "swim_endurance", strength: "strength_full", football: "football_skills", climb: "climb_easy", cardio: "cardio_easy", mobility: "mobility", walk: "walk"};
 const describe = s => s.exercises && s.exercises.length ? `${s.exercises.length} Übungen: ${s.exercises.slice(0, 3).map(e => e.name.replace(/ \(.*\)/, "")).join(", ")}${s.exercises.length > 3 ? " …" : ""}` : ((s.blocks.find(b => /Haupt|Plan|Flow|Einheit/.test(b.label)) || s.blocks[0] || {}).text || "");
 
 function SessionRow({s, onOpen, showDate}) {
@@ -94,7 +95,7 @@ export function Today({onOpen, onAdd, onWizard}) {
 
 export function Plan({onOpen, onAdd, onAvail, onWizard}) {
   const plan = S.activePlan(); if (!plan) return html`<${Empty} onWizard=${onWizard} />`;
-  const [far, setFar] = useState(false), [allPast, setAllPast] = useState(false);
+  const [far, setFar] = useState(false), [allPast, setAllPast] = useState(false), [excl, setExcl] = useState(false);
   const sessions = S.planSessions(), t = S.today(), ws = weekStart(t), idx = weekOf(plan, t), ph = phaseAt(plan, Math.max(0, Math.min(idx, plan.meta.phases[plan.meta.phases.length - 1].toWeek)));
   const lw = weekLoads(plan, sessions, ws), horizon = addDays(t, far ? 56 : 14), prelimFrom = addDays(t, 7);
   const upcoming = sessions.filter(s => s.status === "planned" && s.date >= t && s.date <= horizon).sort((a, b) => a.date.localeCompare(b.date));
@@ -114,7 +115,8 @@ export function Plan({onOpen, onAdd, onAvail, onWizard}) {
       <div class="card stack"><div class="row between"><div><div class="bold">Diese Woche</div><div class="tiny muted">${fmtDay(ws)} – ${fmtDay(addDays(ws, 6))} · ${ph.name}</div></div><button class="btn sm" onClick=${() => onAvail(ws)}>Woche anpassen</button></div><${Meter} ...${lw} /></div>
       <div class="stack"><span class="label" style="margin-bottom:-4px">Vergangen</span>${pgroups.length ? pgroups.map(g => rows(g, false)) : html`<div class="note">Noch keine vergangenen Einheiten.</div>`}
         ${pastAll.length > 8 && html`<button class="btn block" onClick=${() => setAllPast(!allPast)}>${allPast ? "Weniger anzeigen" : `Alle ${pastAll.length} anzeigen`}</button>`}</div>
-      ${(plan.meta.rules || []).length > 0 && html`<div class="section"><span class="label">Dauerhafte Änderungen</span><div class="list">${plan.meta.rules.map(r => html`<div class="li"><div class="grow"><div class="t">${r.label}</div><div class="s">${r.until ? "gilt bis " + fmtDay(r.until) + " " + r.until.slice(0, 4) : "gilt dauerhaft"}</div></div><button class="btn sm" onClick=${() => S.removePlanRule(r.id)}>Entfernen</button></div>`)}</div></div>`}
+      ${excl && html`<${ExcludeSheet} onClose=${() => setExcl(false)} />`}
+      <div class="section"><div class="row between"><span class="label">Dauerhafte Änderungen</span><button class="btn sm" onClick=${() => setExcl(true)}>Sportart ausschließen</button></div>${(plan.meta.rules || []).length === 0 && html`<p class="tiny muted">Keine Regeln. Schließe Sportarten für den ganzen Plan oder einen Zeitraum aus.</p>`}${(plan.meta.rules || []).length > 0 && html`<div class="list">${plan.meta.rules.map(r => html`<div class="li"><div class="grow"><div class="t">${r.label}</div><div class="s">${r.from && r.until ? "gilt " + fmtDay(r.from) + " " + r.from.slice(0, 4) + " bis " + fmtDay(r.until) + " " + r.until.slice(0, 4) : r.from ? "gilt ab " + fmtDay(r.from) + " " + r.from.slice(0, 4) : r.until ? "gilt bis " + fmtDay(r.until) + " " + r.until.slice(0, 4) : "gilt dauerhaft"}</div></div><button class="btn sm" onClick=${() => S.removePlanRule(r.id)}>Entfernen</button></div>`)}</div>`}</div>
       <details class="fold"><summary>Planübersicht<${Icon} name="chevD" size=${18} /></summary><div class="stack">
         ${plan.meta.coachSummary && html`<div class="stack tight"><span class="label">Coach</span><p class="small">${plan.meta.coachSummary}</p></div>`}
         ${plan.meta.warnings.map(w => html`<div class="note warn">${w}</div>`)}

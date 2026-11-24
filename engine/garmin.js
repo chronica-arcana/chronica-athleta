@@ -10,6 +10,7 @@ const TYPE_MAP = {
   football: ["soccer", "football", "futsal"],
   cardio: ["elliptical", "indoor_cardio", "rowing", "indoor_rowing", "stair_climbing", "cardio", "hiit"],
   mobility: ["yoga", "pilates", "stretching", "breathwork"],
+  climb: ["bouldering", "rock_climbing", "indoor_climbing", "climbing"],
   walk: ["walking", "hiking", "casual_walking"]
 };
 export function sportOfActivity(type) {

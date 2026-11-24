@@ -5,7 +5,7 @@ import {KINDS, SPORTS} from "../../engine/catalog.js";
 import {fmtDay} from "../../engine/dates.js";
 
 const SUGGESTIONS = ["Was soll ich heute trainieren?", "Wie viel Pause brauche ich nach einer harten Einheit?", "Ist mein Plan gerade zu anspruchsvoll?", "Wie kann ich meine VO₂max verbessern?"];
-const ruleText = a => `Ersetzt ${a.kinds && a.kinds.length ? a.kinds.map(k => KINDS[k] ? KINDS[k].label : k).join(", ") : (a.sports || []).map(s => SPORTS[s].label + "-Einheiten").join(", ")} ${a.until ? "bis " + fmtDay(a.until) + " " + a.until.slice(0, 4) : "dauerhaft"} durch ${a.replace === "auto" ? "passende Alternativen aus deinem Plan" : KINDS[a.replace].label}.`;
+const ruleText = a => `Ersetzt ${a.kinds && a.kinds.length ? a.kinds.map(k => KINDS[k] ? KINDS[k].label : k).join(", ") : (a.sports || []).map(s => SPORTS[s].label + "-Einheiten").join(", ")} ${a.from ? "ab " + fmtDay(a.from) + " " + a.from.slice(0, 4) + " " : ""}${a.until ? "bis " + fmtDay(a.until) + " " + a.until.slice(0, 4) : "dauerhaft"} durch ${a.replace === "auto" ? "passende Alternativen aus deinem Plan" : KINDS[a.replace].label}.`;
 const keyFor = uid => "tt2_chat_" + uid;
 const load = uid => { try { const v = JSON.parse(localStorage.getItem(keyFor(uid))); return Array.isArray(v) ? v : []; } catch { return []; } };
 const store = (uid, msgs) => { try { localStorage.setItem(keyFor(uid), JSON.stringify(msgs.slice(-40))); } catch {} };

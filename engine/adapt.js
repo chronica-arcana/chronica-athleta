@@ -120,8 +120,8 @@ function scaleWeek(w, ws, today) {
 }
 
 /* ---------- Dauerhafte Regeln ("diese Art Einheit nicht, bis Datum X") ---------- */
-const matchRule = (r, kind, date) => ((r.kinds || []).includes(kind) || (r.sports || []).includes(kindInfo(kind).sport)) && (!r.until || date <= r.until);
-const AUTO_REPLACE = {run: "run_easy", bike: "bike_easy", swim: "swim_technique", cardio: "cardio_easy", walk: "walk", mobility: "mobility", strength: "strength_core"};
+const matchRule = (r, kind, date) => ((r.kinds || []).includes(kind) || (r.sports || []).includes(kindInfo(kind).sport)) && (!r.until || date <= r.until) && (!r.from || date >= r.from);
+const AUTO_REPLACE = {climb: "climb_easy", run: "run_easy", bike: "bike_easy", swim: "swim_technique", cardio: "cardio_easy", walk: "walk", mobility: "mobility", strength: "strength_core"};
 export function replacementFor(plan, r, s) {
   const excluded = new Set([...(r.sports || []), ...(r.kinds || []).map(k => kindInfo(k).sport)]), cand = [];
   if (r.replaceWith && r.replaceWith !== "auto") cand.push(r.replaceWith);
@@ -136,6 +136,9 @@ function enforceRules(w, today) {
   for (const s of w.list()) {
     if (s.status !== "planned" || s.date < today || s.source !== "plan" || s.kind === "event") continue; // vom Nutzer gewählte Einheiten bleiben unberührt
     const r = rules.find(x => matchRule(x, s.kind, s.date)); if (!r) continue;
+    if (kindInfo(s.kind).sport === "mobility" && s.priority === "bonus") { // ausgeschlossene Zusatz-Einheiten (Yoga) entfallen, statt ersetzt zu werden
+      s.status = "skipped"; s.ruleId = r.id; s.origKind = s.kind; w.touch(s.id); counts.set(r.id, (counts.get(r.id) || 0) + 1); continue;
+    }
     const to = replacementFor(w.P, r, s); if (!to) continue;
     if (!s.origKind) s.origKind = s.kind;
     s.kind = to; s.ruleId = r.id; s.title = KINDS[to].label; s.locked = false; ensureBase(s);
@@ -147,9 +150,10 @@ function enforceRules(w, today) {
 export function addRule(plan, sessions, rule, today) {
   const w = work(plan, sessions), kinds = (rule.kinds || []).filter(k => KINDS[k]), sports = (rule.sports || []).filter(sp => SPORTS_OK.has(sp));
   if (!kinds.length && !sports.length) return finish(w);
-  const until = /^\d{4}-\d{2}-\d{2}$/.test(rule.until || "") ? rule.until : null;
+  const until = /^\d{4}-\d{2}-\d{2}$/.test(rule.until || "") ? rule.until : null, from = /^\d{4}-\d{2}-\d{2}$/.test(rule.from || "") && (!until || rule.from <= until) ? rule.from : null;
+  const fd = d => d.slice(8) + "." + d.slice(5, 7) + "." + d.slice(0, 4);
   const names = kinds.length ? kinds.map(k => KINDS[k].label).join(", ") : sports.map(sp => SPORTS[sp] ? SPORTS[sp].label : sp).join(", ");
-  const r = {id: uuid(), kinds, sports, until, replaceWith: rule.replaceWith && KINDS[rule.replaceWith] ? rule.replaceWith : "auto", label: rule.label || `${names} ${until ? "bis " + until.slice(8) + "." + until.slice(5, 7) + "." + until.slice(0, 4) : "dauerhaft nicht"}`.slice(0, 90), createdAt: new Date().toISOString()};
+  const r = {id: uuid(), kinds, sports, from, until, replaceWith: rule.replaceWith && KINDS[rule.replaceWith] ? rule.replaceWith : "auto", label: (rule.label || `${names} ${from && until ? "vom " + fd(from) + " bis " + fd(until) : from ? "ab " + fd(from) : until ? "bis " + fd(until) : "dauerhaft nicht"}`).slice(0, 90), createdAt: new Date().toISOString()};
   w.P.meta.rules = [...(w.P.meta.rules || []), r];
   rebalance(null, null, today, {_w: w});
   if (!w.notes.some(n => /ersetzt/.test(n))) w.note("Regel gespeichert. Aktuell sind keine Einheiten betroffen; sie gilt auch für künftige Anpassungen.");
@@ -159,14 +163,15 @@ export function removeRule(plan, sessions, ruleId, today) {
   const w = work(plan, sessions); let n = 0;
   w.P.meta.rules = (w.P.meta.rules || []).filter(r => r.id !== ruleId);
   for (const s of w.list()) if (s.ruleId === ruleId) {
-    if (s.status === "planned" && s.origKind && KINDS[s.origKind]) { s.kind = s.origKind; s.title = KINDS[s.kind].label; ensureBase(s); rebuild(w, s, s.durationMin); n++; }
+    if (s.status === "skipped" && s.origKind && KINDS[s.origKind]) { s.status = "planned"; n++; }
+    else if (s.status === "planned" && s.origKind && KINDS[s.origKind]) { s.kind = s.origKind; s.title = KINDS[s.kind].label; ensureBase(s); rebuild(w, s, s.durationMin); n++; }
     s.ruleId = undefined; s.origKind = undefined; w.touch(s.id);
   }
   w.note(n ? `Regel entfernt, ${n} Einheit${n === 1 ? "" : "en"} wiederhergestellt.` : "Regel entfernt.");
   rebalance(null, null, today, {_w: w});
   return finish(w);
 }
-const SPORTS_OK = new Set(["run", "bike", "swim", "strength", "football", "cardio", "mobility", "walk"]);
+const SPORTS_OK = new Set(["run", "bike", "swim", "strength", "football", "climb", "cardio", "mobility", "walk"]);
 
 export function rebalance(plan, sessions, today, opts = {}) {
   const w = opts._w || work(plan, sessions);

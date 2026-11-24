@@ -251,7 +251,7 @@ export async function askCoach(history, question) {
 }
 // Vorgeschlagene Änderung der nächsten Einheit ausführen (erst nach Bestätigung durch den Nutzer)
 export async function applyChatAction(a) {
-  if (a.type === "rule") return addPlanRule({kinds: a.kinds, sports: a.sports, until: a.until, replaceWith: a.replace, label: a.label});
+  if (a.type === "rule") return addPlanRule({kinds: a.kinds, sports: a.sports, from: a.from, until: a.until, replaceWith: a.replace, label: a.label});
   const next = nextSession(); if (!next) throw new Error("Es ist keine kommende Einheit geplant.");
   if (a.type === "swap") return swap(next.id, a.kind);
   if (a.type === "skip") return skip(next.id);

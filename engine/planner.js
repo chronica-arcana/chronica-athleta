@@ -82,6 +82,9 @@ function slotsFor(sport, count, q, goal, weekIdx, phaseKey) {
   } else if (sport === "football") {
     const order = ["football_skills", q > 0 ? "football_conditioning" : "football_skills", "football_skills"];
     for (let i = 0; i < count; i++) out.push(order[i] || "football_skills");
+  } else if (sport === "climb") {
+    const order = ["climb_easy", q > 0 ? "climb_hard" : "climb_easy", "climb_easy"];
+    for (let i = 0; i < count; i++) out.push(order[i] || "climb_easy");
   } else if (sport === "cardio") {
     const order = ["cardio_easy", q >= 2 ? "cardio_intervals" : "cardio_easy", "cardio_easy"];
     for (let i = 0; i < count; i++) out.push(order[i] || "cardio_easy");
@@ -118,14 +121,14 @@ function allocate(R, sports, primary) {
 
 const MULT = {run_long: 1.6, bike_long: 1.7, swim_endurance: 1.1, run_intervals: 0.9, bike_intervals: 0.9, strength_core: 0.7, strength_lower: 1, football_skills: 1.3,
   football_conditioning: 1.2, team_match: 1.5, mobility: 0.7, walk: 1.2};
-const CAP = {run_long: 150, bike_long: 240, swim_endurance: 75, strength_full: 70, strength_lower: 70, strength_upper: 70, strength_core: 45, mobility: 45, football_skills: 100, football_conditioning: 80};
+const CAP = {run_long: 150, bike_long: 240, swim_endurance: 75, strength_full: 70, strength_lower: 70, strength_upper: 70, strength_core: 45, mobility: 45, football_skills: 100, football_conditioning: 80, climb_easy: 120, climb_hard: 90};
 function minutesFor(kind, typical, factor) {
   if (kind === "strength_snack") return 20;
   const m = typical * (MULT[kind] || 1) * factor;
   return round5(clamp(m, 15, CAP[kind] || 150));
 }
 
-const LIGHT = {swim_endurance: "swim_technique", swim_intervals: "swim_technique", football_conditioning: "football_skills", team_match: "football_skills", cardio_intervals: "cardio_easy"};
+const LIGHT = {swim_endurance: "swim_technique", swim_intervals: "swim_technique", football_conditioning: "football_skills", team_match: "football_skills", climb_hard: "climb_easy", cardio_intervals: "cardio_easy"};
 function lightKind(kind) { return LIGHT[kind] || kind.replace(/_(tempo|intervals|long)$/, "_easy"); }
 
 export function compose(goal, N, weekIdx, phaseKey, deload) {
@@ -254,12 +257,12 @@ export function normalizeGoal(g) {
   goal.minutesPerSession = clamp(Math.round(goal.minutesPerSession), 15, 180);
   return goal;
 }
-const KINDS_SPORTS = new Set(["run", "bike", "swim", "strength", "football", "cardio", "mobility", "walk"]);
+const KINDS_SPORTS = new Set(["run", "bike", "swim", "strength", "football", "climb", "cardio", "mobility", "walk"]);
 
 export function defaultTitle(goal) {
   const preset = goal.event && EVENT_PRESETS[goal.event.preset];
   if (goal.event && (goal.event.name || preset)) return goal.event.name || preset.label;
-  const names = {run: "Laufen", bike: "Radfahren", swim: "Schwimmen", strength: "Kraft", football: "Fußball", cardio: "Ausdauer", mobility: "Mobility", walk: "Wandern"};
+  const names = {run: "Laufen", bike: "Radfahren", swim: "Schwimmen", strength: "Kraft", football: "Fußball", climb: "Bouldern", cardio: "Ausdauer", mobility: "Mobility", walk: "Wandern"};
   if (goal.mode === "return") return "Wiedereinstieg: " + goal.sports.map(s => names[s]).join(" + ");
   return goal.sports.map(s => names[s]).join(" + ") + (goal.mode === "health" ? " – Fit & gesund" : " – Plan");
 }

@@ -58,7 +58,7 @@ test("Regel bleibt auch dann wirksam, wenn eine Entschärfung eine ausgeschlosse
 
 test("Chat-Regelvorschlag wird geprüft: gültige Arten, Datum, nur eine Regel", () => {
   const ok = sanitizeChat({reply: "x", actions: [{type: "rule", label: "Fußball bis Februar ersetzen", kinds: ["football_skills", "team_match", "nix"], until: "2027-02-01", replace: "run_easy"}]}, TODAY).actions[0];
-  assert.deepEqual(ok, {type: "rule", label: "Fußball bis Februar ersetzen", kinds: ["football_skills", "team_match"], sports: [], until: "2027-02-01", replace: "run_easy"});
+  assert.deepEqual(ok, {type: "rule", label: "Fußball bis Februar ersetzen", kinds: ["football_skills", "team_match"], sports: [], from: null, until: "2027-02-01", replace: "run_easy"});
   assert.equal(sanitizeChat({actions: [{type: "rule", kinds: ["football_skills"], until: "2020-01-01"}]}, TODAY).actions.length, 0, "Datum in der Vergangenheit");
   assert.equal(sanitizeChat({actions: [{type: "rule", kinds: ["football_skills"], until: "2031-01-01"}]}, TODAY).actions.length, 0, "mehr als 2 Jahre voraus");
   assert.equal(sanitizeChat({actions: [{type: "rule", kinds: ["event"]}, {type: "rule", sports: ["unsinn"]}]}, TODAY).actions.length, 0, "nur gültige Arten");
@@ -71,4 +71,33 @@ test("Chat-Kontext nennt die Arten im Plan und bestehende Regeln", () => {
   assert.ok(ctx.artenImPlan.length > 0 && ctx.artenImPlan.every(a => a.art && a.bezeichnung && a.anzahl > 0)); assert.ok(ctx.artenImPlan.some(a => a.art === "football_conditioning") || ctx.artenImPlan.length > 0);
   assert.equal(ctx.regeln.length, 1); assert.deepEqual(ctx.regeln[0].arten, ["football_skills"]); assert.equal(ctx.regeln[0].bis, "2027-02-01");
   assert.ok(JSON.stringify(ctx).length < 6000);
+});
+
+test("Bouldern: wird eingeplant und lässt sich als Sportart ausschließen (Zeitraum, mit Wiederherstellung)", () => {
+  let st = generatePlan({...goal, sports: ["climb", "strength", "run"], primary: "climb", mode: "performance", injury: false}, {planId: "c"});
+  const climb = st.sessions.filter(s => kindInfo(s.kind).sport === "climb");
+  assert.ok(climb.length > 10, "Bouldern im Plan"); assert.ok(climb.every(s => s.blocks.length > 0 && s.title));
+  const from = addDays(TODAY, 14), until = addDays(TODAY, 42);
+  const res = addRule(st.plan, st.sessions, {sports: ["climb"], from, until}, TODAY); st = apply(st, res);
+  const r = st.plan.meta.rules[0]; assert.equal(r.from, from); assert.ok(/vom .* bis /.test(r.label));
+  for (const s of st.sessions) if (s.status === "planned") {
+    if (s.date >= from && s.date <= until) assert.notEqual(kindInfo(s.kind).sport, "climb", s.date);
+    if (s.date < from || s.date > until) { /* außerhalb unverändert */ if (s.ruleId) assert.fail("außerhalb ersetzt " + s.date); }
+  }
+  assert.ok(st.sessions.some(s => s.date > until && kindInfo(s.kind).sport === "climb"));
+  const back = apply(st, removeRule(st.plan, st.sessions, r.id, TODAY));
+  assert.ok(back.sessions.filter(s => s.status === "planned" && s.date >= from && s.date <= until).some(s => kindInfo(s.kind).sport === "climb"), "nach Entfernen wieder da");
+});
+
+test("Yoga/Mobility ausschließen: Bonus-Einheiten entfallen und kommen nach Entfernen zurück", () => {
+  let st = generatePlan({...goal, sports: ["run", "strength"], primary: "run", mode: "performance", injury: false, daysPerWeek: 3}, {planId: "y"});
+  const yoga = () => st.sessions.filter(s => s.status === "planned" && s.date >= TODAY && kindInfo(s.kind).sport === "mobility");
+  const n0 = yoga().length; if (!n0) return;
+  st = apply(st, addRule(st.plan, st.sessions, {sports: ["mobility"]}, TODAY)); assert.equal(yoga().length, 0);
+  st = apply(st, removeRule(st.plan, st.sessions, st.plan.meta.rules[0].id, TODAY)); assert.equal(yoga().length, n0);
+});
+
+test("Chat-Regel nimmt ganze Sportarten und ein Startdatum an", () => {
+  const out = sanitizeChat({reply: "ok", actions: [{type: "rule", label: "Laufen pausieren", sports: ["run", "unsinn"], from: addDays(TODAY, 7), until: addDays(TODAY, 30)}]}, TODAY);
+  assert.deepEqual([out.actions[0].sports, out.actions[0].from], [["run"], addDays(TODAY, 7)]);
 });

@@ -5,7 +5,7 @@ import {actualLoad} from "./adapt.js";
 import {addDays} from "./dates.js";
 
 const median = a => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y), m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
-const LPM = {run: 1.3, bike: 1.1, swim: 1.4, strength: 1.3, football: 1.6, cardio: 1.2, mobility: 0.5, walk: 0.6};
+const LPM = {run: 1.3, bike: 1.1, swim: 1.4, strength: 1.3, football: 1.6, climb: 1.3, cardio: 1.2, mobility: 0.5, walk: 0.6};
 
 // Belastung einer Garmin-Aktivität (gleiche Einheit wie die Plan-Last: Minuten × Faktor), Trainingseffekt erhöht sie
 export function activityLoad(a) {

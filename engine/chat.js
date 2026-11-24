@@ -15,9 +15,10 @@ export function sanitizeChat(data, today = new Date().toISOString().slice(0, 10)
     if (a.type === "rule") { // dauerhafte Planregel: Arten/Sportarten müssen gültig sein, Datum nicht in der Vergangenheit und höchstens 2 Jahre voraus
       const kinds = (Array.isArray(a.kinds) ? a.kinds : []).filter(k => CHAT_KINDS.includes(k)).slice(0, 5), sports = (Array.isArray(a.sports) ? a.sports : []).filter(s => PICKABLE_SPORTS.includes(s)).slice(0, 2);
       if ((!kinds.length && !sports.length) || actions.some(x => x.type === "rule")) continue;
-      let until = null;
+      let until = null, from = null;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(a.from || "")) { if (a.from > addDays(today, 730)) continue; from = a.from > today ? a.from : null; }
       if (/^\d{4}-\d{2}-\d{2}$/.test(a.until || "")) { if (a.until < today || a.until > addDays(today, 730)) continue; until = a.until; }
-      actions.push({type: "rule", label: label.slice(0, 70) || "Planregel anlegen", kinds, sports, until, replace: CHAT_KINDS.includes(a.replace) ? a.replace : "auto"});
+      actions.push({type: "rule", label: label.slice(0, 70) || "Planregel anlegen", kinds, sports, from, until, replace: CHAT_KINDS.includes(a.replace) ? a.replace : "auto"});
       continue;
     }
     const out = {type: a.type, label: label.slice(0, 48)};

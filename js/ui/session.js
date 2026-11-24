@@ -122,6 +122,18 @@ export function RuleSheet({session, onClose}) {
     <button class="btn primary block" disabled=${!valid} onClick=${async () => { await S.addPlanRule({kinds: scope === "kind" ? [session.kind] : [], sports: scope === "sport" ? [info.sport] : [], until: forever ? null : until, replaceWith: rep}); onClose(); }}>Regel anlegen</button></div><//>`;
 }
 
+export function ExcludeSheet({onClose}) {
+  const [sel, setSel] = useState([]), [mode, setMode] = useState("always"), [from, setFrom] = useState(""), [until, setUntil] = useState("");
+  const t = S.today(), fromOk = mode === "always" || !from || from >= t, untilOk = mode === "always" || (until && until >= t && (!from || from <= until));
+  const valid = sel.length > 0 && fromOk && untilOk;
+  return html`<${Sheet} title="Sportart ausschließen" onClose=${onClose}><div class="stack">
+    <p class="muted small">Gewählte Sportarten werden nicht eingeplant, auch nicht bei späteren Anpassungen. Bereits geplante Einheiten werden durch passende Alternativen ersetzt. Die Regel lässt sich jederzeit unter Plan entfernen.</p>
+    <div class="grid2">${PICKABLE_SPORTS.map(s => html`<${Option} compact=${true} sel=${sel.includes(s)} onClick=${() => setSel(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s])}>${SPORTS[s].label}<//>`)}</div>
+    <div class="stack tight"><span class="label">Gilt</span><${Seg} options=${[{value: "always", label: "Für den ganzen Plan"}, {value: "range", label: "Für einen Zeitraum"}]} value=${mode} onChange=${setMode} />
+      ${mode === "range" && html`<div class="grid2"><label class="field">Von<input type="date" min=${t} value=${from} onChange=${e => setFrom(e.target.value)} /></label><label class="field">Bis einschließlich<input type="date" min=${from || t} value=${until} onChange=${e => setUntil(e.target.value)} /></label></div><p class="tiny muted">Ohne Startdatum gilt der Ausschluss ab heute.</p>`}</div>
+    <button class="btn primary block" disabled=${!valid} onClick=${async () => { await S.addPlanRule({sports: sel, from: mode === "range" && from ? from : null, until: mode === "range" ? until : null, replaceWith: "auto"}); onClose(); }}>Ausschließen</button></div><//>`;
+}
+
 export function SessionSheet({id, onClose}) {
   const s = S.state.sessions.find(x => x.id === id); if (!s) return null;
   const [sub, setSub] = useState(null);

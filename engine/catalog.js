@@ -7,6 +7,7 @@ export const SPORTS = {
   swim:     {label: "Schwimmen",         icon: "🏊", color: "#06b6d4"},
   strength: {label: "Kraft / Fitness",   icon: "🏋️", color: "#a855f7"},
   football: {label: "Fußball / Teamsport", icon: "⚽", color: "#22c55e"},
+  climb:    {label: "Bouldern / Klettern", icon: "🧗", color: "#d97706"},
   cardio:   {label: "Ausdauer allgemein", icon: "❤️‍🔥", color: "#ef4444"},
   mobility: {label: "Yoga / Mobility",   icon: "🧘", color: "#14b8a6"},
   walk:     {label: "Gehen / Wandern",   icon: "🥾", color: "#84cc16"},
@@ -35,6 +36,8 @@ export const KINDS = {
   football_skills:       K("football", "skill", "moderate", "Technik & Ball", "⚽", 1.3),
   football_conditioning: K("football", "skill", "hard", "Fußball-Kondition", "🔥", 2.0, {key: true, quality: true}),
   team_match:            K("football", "skill", "hard", "Spiel / Mannschaftstraining", "🏟️", 2.0, {key: true}),
+  climb_easy: K("climb", "skill", "moderate", "Bouldern (Technik & Volumen)", "🧗", 1.2),
+  climb_hard: K("climb", "skill", "hard", "Bouldern (Projekte & Kraft)", "🧗", 1.8, {key: true, quality: true}),
   cardio_easy:      K("cardio", "cardio", "easy", "Lockeres Cardio", "❤️‍🔥", 0.9),
   cardio_intervals: K("cardio", "cardio", "hard", "Cardio-Intervalle", "🔥", 2.0, {key: true, quality: true}),
   mobility: K("mobility", "recovery", "easy", "Yoga / Mobility", "🧘", 0.5),
@@ -46,12 +49,12 @@ export const kindInfo = kind => KINDS[kind] || KINDS.custom;
 export const sportOfKind = kind => kindInfo(kind).sport;
 
 // Sportarten, aus denen beim Anlegen/Tauschen einer Einheit gewählt werden kann (event/custom bewusst separat)
-export const PICKABLE_SPORTS = ["run", "bike", "swim", "strength", "football", "cardio", "mobility", "walk"];
+export const PICKABLE_SPORTS = ["run", "bike", "swim", "strength", "football", "climb", "cardio", "mobility", "walk"];
 export const kindsOfSport = sport => Object.keys(KINDS).filter(k => KINDS[k].sport === sport && k !== "strength_snack" && k !== "run_walkrun");
 // Eine Stufe entschärfen, falls zwei harte Einheiten direkt aufeinander folgen
 export const DOWNGRADE = {run_intervals: "run_tempo", run_tempo: "run_easy", bike_intervals: "bike_tempo", bike_tempo: "bike_easy",
   swim_intervals: "swim_endurance", swim_endurance: "swim_technique", football_conditioning: "football_skills",
-  team_match: "football_skills", cardio_intervals: "cardio_easy"};
+  team_match: "football_skills", climb_hard: "climb_easy", cardio_intervals: "cardio_easy"};
 
 // Übungsbibliothek. tier: 0 = nur Körpergewicht/Zuhause, 1 = Kurzhanteln/Bänder, 2 = Fitnessstudio
 export const EXERCISES = [

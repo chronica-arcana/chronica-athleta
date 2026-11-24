@@ -54,4 +54,4 @@ export function importGarminActivities(plan, sessions, activities, today, sinceD
   }
   return {plan: cur.plan, sessions: [...touched.values()].map(x => cur.sessions.find(y => y.id === x.id) || x), removed: [], notes, count};
 }
-export const DEFAULT_KIND = {run: "run_easy", bike: "bike_easy", swim: "swim_endurance", strength: "strength_full", football: "football_skills", cardio: "cardio_easy", mobility: "mobility", walk: "walk"};
+export const DEFAULT_KIND = {run: "run_easy", bike: "bike_easy", swim: "swim_endurance", strength: "strength_full", football: "football_skills", climb: "climb_easy", cardio: "cardio_easy", mobility: "mobility", walk: "walk"};
