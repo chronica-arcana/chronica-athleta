@@ -3,6 +3,7 @@ import {loadDraft, saveDraft, clearDraft, hasContent} from "../drafts.js";
 import {Sheet, Seg, Icon, SportMark, INTENSITY_TXT, Option, Row, fmtNum} from "./common.js";
 import * as S from "../store.js";
 import {SPORTS, KINDS, kindInfo, kindsOfSport, PICKABLE_SPORTS} from "../../engine/catalog.js";
+import {exerciseGuide} from "../../engine/exercise-guide.js";
 import {fmtShort, addDays, DAY_SHORT, dow, weekStart} from "../../engine/dates.js";
 
 const ACTION = {increase_weight: ["Mehr Gewicht", "good"], increase_reps: ["Mehr Wiederholungen", "good"], hold: ["Halten", "warn"], reduce: ["Reduzieren", "bad"]};
@@ -49,6 +50,7 @@ export function LogSheet({session, onClose}) {
   const exRows = (s.exercises || []).map((ex, i) => { const t = ex.target; return html`<div class="ex stack tight" key=${i}>
     <div class="row between"><div class="bold">${ex.name}</div><span class="tag">${ex.sets} × ${ex.repMin}${ex.repMax !== ex.repMin ? "–" + ex.repMax : ""}${ex.type === "time" ? " Sek." : ""}</span></div>
     ${t && html`<div class="target">Ziel: ${tgtLabel(t)}</div>`}
+    <${ExerciseGuide} name=${ex.name} />
     ${Array.from({length: ex.sets}, (_, j) => { const cur = (sets[i] || [])[j] || {};
       return ex.type === "time" ? html`<div class="setgrid" key=${j}><span class="n">${j + 1}</span><input type="number" inputmode="numeric" placeholder=${t && t.seconds ? "Ziel " + t.seconds : "Sek."} value=${cur.seconds ?? ""} onInput=${e => setVal(i, j, "seconds", e.target.value)} /><span class="muted small">Sekunden</span></div>`
         : html`<div class="setgrid" key=${j}><span class="n">${j + 1}</span>${ex.type === "weight" ? html`<input type="text" inputmode="decimal" placeholder=${t && t.weight != null ? "Ziel " + fmtNum(t.weight) + " kg" : "kg"} value=${cur.weight ?? ""} onInput=${e => setVal(i, j, "weight", e.target.value)} />` : html`<span class="muted small">Körpergewicht</span>`}<input type="number" inputmode="numeric" placeholder=${t && t.reps != null ? "Ziel " + t.reps : "Wdh."} value=${cur.reps ?? ""} onInput=${e => setVal(i, j, "reps", e.target.value)} /></div>`; })}</div>`; });
@@ -109,6 +111,15 @@ export function AvailabilitySheet({ws, onClose}) {
     <button class="btn primary block" disabled=${sel.length === 0} onClick=${async () => { await S.availability(ws, sel); onClose(); }}>Woche neu verteilen</button></div><//>`;
 }
 
+export function ExerciseGuide({name}) {
+  const g = exerciseGuide(name); if (!g) return null;
+  return html`<details class="guide"><summary>So geht's</summary><div class="stack tight">
+    <div><span class="label">Das brauchst du</span><p class="small">${g.gear}</p></div>
+    <div><span class="label">Ausführung</span><ol>${g.steps.map(x => html`<li>${x}</li>`)}</ol></div>
+    <div><span class="label">Typische Fehler</span><ul>${g.mistakes.map(x => html`<li>${x}</li>`)}</ul></div>
+    ${g.tip && html`<div class="note">${g.tip}</div>`}</div></details>`;
+}
+
 export function RuleSheet({session, onClose}) {
   const info = kindInfo(session.kind), [scope, setScope] = useState("kind"), [forever, setForever] = useState(true), [until, setUntil] = useState(""), [rep, setRep] = useState("auto");
   const reps = ["auto", ...PICKABLE_SPORTS.filter(sp => sp !== info.sport && sp !== "strength").flatMap(sp => kindsOfSport(sp).filter(k => KINDS[k].intensity === "easy"))];
@@ -150,8 +161,8 @@ export function SessionSheet({id, onClose}) {
     ${s.auto && html`<div class="note">Angepasst: ${s.auto.reason}</div>`}
     ${(s.blocks || []).map(b => html`<div class="block"><b>${b.label}</b><span>${b.text}</span></div>`)}
     ${(s.flow || []).length > 0 && html`<div class="stack tight"><span class="label">Ablauf</span><div>${s.flow.map(p => html`<div class="ex"><div class="row between"><div class="bold">${p.name}</div><span class="tag">${p.label}</span></div><div class="small muted">${p.cue}</div></div>`)}</div></div>`}
-    ${(s.exercises || []).length > 0 && html`<div class="stack tight"><span class="label">Übungen</span><div>${s.exercises.map(e => html`<div class="ex"><div class="row between"><div class="bold">${e.name}</div><span class="tag">${e.sets} × ${e.repMin}${e.repMax !== e.repMin ? "–" + e.repMax : ""}${e.type === "time" ? " Sek." : ""}</span></div><div class="small muted">${e.cue}</div>${e.target && html`<div class="target">Ziel: ${tgtLabel(e.target)}</div>`}</div>`)}</div></div>`}
-    ${s.addon && s.addon.exercises && html`<div class="stack tight"><span class="label">Kraft-Snack · ${s.addon.minutes} Min</span><div>${s.addon.exercises.map(e => html`<div class="ex"><div class="bold">${e.name}</div><div class="small muted">${e.sets} × ${e.repMin}–${e.repMax} · ${e.cue}</div></div>`)}</div></div>`}
+    ${(s.exercises || []).length > 0 && html`<div class="stack tight"><span class="label">Übungen</span><div>${s.exercises.map(e => html`<div class="ex"><div class="row between"><div class="bold">${e.name}</div><span class="tag">${e.sets} × ${e.repMin}${e.repMax !== e.repMin ? "–" + e.repMax : ""}${e.type === "time" ? " Sek." : ""}</span></div><div class="small muted">${e.cue}</div>${e.target && html`<div class="target">Ziel: ${tgtLabel(e.target)}</div>`}<${ExerciseGuide} name=${e.name} /></div>`)}</div></div>`}
+    ${s.addon && s.addon.exercises && html`<div class="stack tight"><span class="label">Kraft-Snack · ${s.addon.minutes} Min</span><div>${s.addon.exercises.map(e => html`<div class="ex"><div class="bold">${e.name}</div><div class="small muted">${e.sets} × ${e.repMin}–${e.repMax} · ${e.cue}</div><${ExerciseGuide} name=${e.name} /></div>`)}</div></div>`}
     ${isDone && s.analysis && html`<${AnalysisCard} a=${s.analysis} sessionId=${s.id} />`}
     ${!skipped && html`<button class="btn primary block" onClick=${() => setSub("log")}>${isDone ? "Log ansehen oder ändern" : "Training loggen"}</button>`}
     ${!isDone && !skipped && html`<div class="list"><${Row} title="Etwas anderes machen" onClick=${() => setSub("swap")} /><${Row} title="Verschieben" onClick=${() => setSub("move")} />

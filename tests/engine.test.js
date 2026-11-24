@@ -189,3 +189,11 @@ test("Garmin-Exportdatei wird normalisiert und validiert", () => {
   assert.deepEqual([out.daily[0].hrvStatus, out.daily[0].sleepHours], ["LOW", 7.5]);
   assert.throws(() => normalizeExport({}), /keine Aktivitäten/); assert.throws(() => normalizeExport(null));
 });
+
+import {GUIDE as _GUIDE, exerciseGuide as _eg} from "../engine/exercise-guide.js";
+import {EXERCISES as _EX} from "../engine/catalog.js";
+test("Jede Kraftübung hat eine vollständige Anleitung (Material, Schritte, Fehler)", () => {
+  for (const e of _EX) { const g = _eg(e.name); assert.ok(g, e.name); assert.ok(g.gear.length > 5 && g.steps.length >= 3 && g.mistakes.length >= 1, e.name); }
+  assert.ok(/Hüfte/.test(_GUIDE["Rumänisches Kreuzheben"].steps.join(" ")));
+  assert.equal(_eg("Gibt es nicht"), null);
+});

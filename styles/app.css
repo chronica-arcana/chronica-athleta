@@ -160,3 +160,12 @@ hr{border:0;border-top:1px solid var(--line);margin:0;width:100%}
 .chat-input{position:sticky;bottom:calc(62px + var(--safe-b));display:flex;gap:8px;align-items:flex-end;padding:10px 0;background:linear-gradient(transparent,var(--bg) 24%)}
 .chat-input textarea{min-height:46px;max-height:140px;resize:none}
 @media (min-width:960px){.chat-input{bottom:16px}}
+
+/* Übungsanleitung */
+.guide { margin-top: 6px; }
+.guide > summary { cursor: pointer; font-size: .82rem; font-weight: 600; color: var(--muted, #6b7280); list-style: none; padding: 4px 0; }
+.guide > summary::-webkit-details-marker { display: none; }
+.guide > summary::after { content: " ▾"; }
+.guide[open] > summary::after { content: " ▴"; }
+.guide ol, .guide ul { margin: 4px 0 0; padding-left: 18px; font-size: .88rem; line-height: 1.45; }
+.guide li { margin-bottom: 3px; }
